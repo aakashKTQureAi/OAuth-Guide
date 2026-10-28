@@ -1,0 +1,59 @@
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --text: #1c1c1a;
+  --muted: #5f5f5a;
+  --border: #e2e2dc;
+  --accent: #2f5bd3;
+  --accent-text: #ffffff;
+  --ok-bg: #e5f4ea; --ok: #1d6b3a;
+  --info-bg: #e6eefc; --info: #24489e;
+  --warn-bg: #fdf1dc; --warn: #8a5a00;
+  --gap-bg: #fbe7e7; --gap: #9b2c2c;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --surface: #20201e; --text: #ececea; --muted: #a3a39c;
+    --border: #34342f; --accent: #7f9ff5; --accent-text: #10131c;
+    --ok-bg: #173323; --ok: #8fd6a8;
+    --info-bg: #1b2a4a; --info: #a9c1f7;
+    --warn-bg: #3a2c0f; --warn: #f0c46b;
+    --gap-bg: #3d1c1c; --gap: #f2a3a3;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: var(--accent); }
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+header.top {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  max-width: 760px; margin: 0 auto; padding: 16px 16px 0; flex-wrap: wrap;
+}
+header.top .brand { font-weight: 600; text-decoration: none; color: var(--text); }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted);
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+h1 { font-size: clamp(28px, 6vw, 40px); line-height: 1.15; margin: 40px 0 12px; }
+.lede { color: var(--muted); margin: 0 0 28px; max-width: 60ch; }
+form.search { display: flex; gap: 8px; flex-wrap: wrap; }
+form.search input {
+  flex: 1 1 260px; min-width: 0; font: inherit; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text);
+}
+button, .button {
+  font: inherit; font-weight: 600; padding: 12px 18px; border-radius: 10px; border: 0;
+  background: var(--accent); color: var(--accent-text); cursor: pointer; text-decoration: none;
+}
+.hint { font-size: 14px; color: var(--muted); margin-top: 10px; }
+.promise {
+  margin-top: 40px; padding: 14px 16px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--surface); font-size: 14px; color: var(--muted);
+}
+.secondary { margin-top: 20px; }
+.error { color: var(--gap); margin-top: 10px; min-height: 1.5em; }
