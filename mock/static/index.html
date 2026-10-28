@@ -23,7 +23,11 @@
           </select>
         </label>
         <label>Model <input name="model" required></label>
-        <label id="conn-portkey" hidden>Portkey provider slug <input name="portkey_provider" placeholder="anthropic"></label>
+        <div id="conn-portkey" hidden class="conn-portkey">
+          <label>Portkey virtual key <input name="portkey_virtual_key" autocomplete="off" spellcheck="false" placeholder="anthropic-xxxx"></label>
+          <label>or provider slug <input name="portkey_provider" placeholder="@my-anthropic"></label>
+          <p class="hint">Use one: a virtual key for a stored Anthropic credential, or a Model Catalog provider slug.</p>
+        </div>
         <label>API key <input name="api_key" type="password" required autocomplete="off" spellcheck="false"></label>
         <button type="submit">Connect</button>
         <p class="hint" id="conn-status" aria-live="polite">One provider at a time. The key stays in this server's memory for your session only: never logged, stored, or sent back to the page. Use a key with a spending limit.</p>

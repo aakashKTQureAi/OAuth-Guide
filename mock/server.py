@@ -282,7 +282,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         provider = body.get("provider")
         conn = {"provider": provider, "api_key": str(body.get("api_key") or "").strip(),
                 "model": str(body.get("model") or "").strip() or providers.DEFAULT_MODELS.get(provider, ""),
-                "portkey_provider": str(body.get("portkey_provider") or "").strip()}
+                "portkey_provider": str(body.get("portkey_provider") or "").strip(),
+                "portkey_virtual_key": str(body.get("portkey_virtual_key") or "").strip()}
         if provider not in providers.PROVIDERS or not conn["api_key"] or not conn["model"] or len(conn["api_key"]) > 512:
             return self.send_json(400, {"error": "Choose a provider and enter a key and model."})
         try:
@@ -308,6 +309,8 @@ def self_check():
     assert parse_query("https://developers.linear.app/docs/oauth")[2] == "https://developers.linear.app/docs/oauth"
     assert parse_query("linear.app")[2] is None
     assert not SLUG.match("../etc") and not SLUG.match("")
+    assert providers.portkey_headers({"api_key": "k", "portkey_virtual_key": "vk"}) == {"x-portkey-api-key": "k", "x-portkey-virtual-key": "vk"}
+    assert providers.portkey_headers({"api_key": "k", "portkey_provider": ""})["x-portkey-provider"] == "anthropic"
     check_connect_endpoint()
     check_pipeline()
     check_data_dir()

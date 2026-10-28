@@ -10,12 +10,21 @@ class ConnectionFailed(Exception):
     """Safe-to-show reason; never contains the key."""
 
 
+def portkey_headers(conn):
+    """A virtual key names the provider credential stored in Portkey; otherwise route by provider slug."""
+    headers = {"x-portkey-api-key": conn["api_key"]}
+    if conn.get("portkey_virtual_key"):
+        headers["x-portkey-virtual-key"] = conn["portkey_virtual_key"]
+    else:
+        headers["x-portkey-provider"] = conn.get("portkey_provider") or "anthropic"
+    return headers
+
+
 def anthropic_client(conn):
     if conn["provider"] == "portkey":
         # Portkey authenticates with its own header; the Anthropic key slot is unused.
         return anthropic.Anthropic(api_key="portkey", base_url=PORTKEY_BASE_URL, max_retries=1, timeout=60.0,
-                                   default_headers={"x-portkey-api-key": conn["api_key"],
-                                                    "x-portkey-provider": conn.get("portkey_provider") or "anthropic"})
+                                   default_headers=portkey_headers(conn))
     return anthropic.Anthropic(api_key=conn["api_key"], max_retries=1, timeout=60.0)
 
 

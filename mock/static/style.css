@@ -107,3 +107,5 @@ section.connect summary { cursor: pointer; color: var(--accent); font-size: 15px
 .conn-form input, .conn-form select { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); min-width: 0; }
 .conn-form button { justify-self: start; }
 .conn-form label[hidden] { display: none; }
+.conn-portkey { display: grid; gap: 10px; }
+.conn-portkey[hidden] { display: none; }
