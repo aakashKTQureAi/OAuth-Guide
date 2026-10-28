@@ -3,10 +3,10 @@
 Usage: python3 mock/server.py               serve on 127.0.0.1:8780
        python3 mock/server.py --self-check
 """
-import datetime, http.server, json, re, secrets, sys, threading, time, urllib.parse
+import datetime, http.server, json, os, re, secrets, sys, threading, time, urllib.parse
 from pathlib import Path
 
-import providers
+import providers, research, validate
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
@@ -15,6 +15,11 @@ QUEUE = ROOT / "queue"
 PORT = 8780
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 HOST_PREFIXES = ("www.", "docs.", "developer.", "developers.", "api.", "app.")
+# With no model connected, local development can still hand requests to a Claude Code session watching mock/queue.
+LOCAL_AGENT = os.environ.get("LOCAL_AGENT", "1") == "1"
+MAX_JOBS = 3
+JOBS = set()
+JOBS_LOCK = threading.Lock()
 SESSION_TTL = 2 * 3600
 MAX_SESSIONS = 1000
 SESSIONS = {}  # sid -> {"conn": {...}, "seen": t}; memory only, so keys vanish on restart
@@ -42,6 +47,61 @@ def session_put(sid, conn):
 def session_drop(sid):
     with SESSIONS_LOCK:
         SESSIONS.pop(sid, None)
+
+
+def update_request(slug, **fields):
+    path = QUEUE / f"{slug}.json"
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return
+    data.update(fields)
+    write_atomic(path, data)
+
+
+def write_atomic(path, data):
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    tmp.replace(path)  # readers never see a half-written file
+
+
+def review_problems(guide, fetch):
+    v = validate.verify(guide, fetch)
+    return [f"{r['id']}: {r['reason']} ({r['url']})" for r in v["results"] if not r["ok"]] + validate.time_errors(guide)
+
+
+def run_job(request, conn):
+    """Research, gate with validate.py, save. conn holds the visitor's key only for this thread's lifetime."""
+    slug = request["slug"]
+    try:
+        label = {"anthropic": "Claude", "openai": "OpenAI", "portkey": "Portkey"}[conn["provider"]]
+        update_request(slug, state="researching", note=f"{label} ({conn['model']}) is searching official documentation.")
+        fetch = validate.cached_fetcher()
+        guide, _fetched = research.RESEARCHERS[conn["provider"]](conn, request, lambda g: review_problems(g, fetch))
+        update_request(slug, state="validating", note="Re-fetching every cited page to confirm each quote.")
+        review_problems(guide, fetch)  # records verification; failed quotes save as Incomplete, not as errors
+        if validate.time_errors(guide):
+            raise research.ResearchFailed("The guide was malformed after one repair round.")
+        write_atomic(GUIDES / f"{slug}.json", guide)
+        (QUEUE / f"{slug}.json").unlink(missing_ok=True)
+    except research.ResearchFailed as exc:
+        update_request(slug, state="failed", note=str(exc))
+    except Exception as exc:  # never leave a request stuck in "researching"
+        update_request(slug, state="failed", note=f"Research stopped unexpectedly ({type(exc).__name__}).")
+    finally:
+        with JOBS_LOCK:
+            JOBS.discard(slug)
+
+
+def start_job(request, conn):
+    with JOBS_LOCK:
+        if request["slug"] in JOBS:
+            return True
+        if len(JOBS) >= MAX_JOBS:
+            return False
+        JOBS.add(request["slug"])
+    threading.Thread(target=run_job, args=(request, dict(conn)), daemon=True).start()
+    return True
 
 
 def public_conn(conn):
@@ -171,14 +231,24 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         slug = new_slug(query)
         if not SLUG.match(slug):
             return self.send_json(400, {"error": "Could not read an app name from that input."})
+        conn = session_get(self.sid())
+        if not conn and not LOCAL_AGENT:
+            return self.send_json(409, {"error": "No saved guide yet. Connect a model to generate one.", "needs_model": True})
         QUEUE.mkdir(exist_ok=True)
-        request = QUEUE / f"{slug}.json"
-        if not request.exists():  # repeat searches join the existing request instead of resetting it
-            request.write_text(json.dumps({
-                "slug": slug, "query": query, "docs_url": parse_query(query)[2], "state": "queued",
-                "note": "Waiting for the research agent to pick this up.",
-                "requested_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-            }, indent=2))
+        path = QUEUE / f"{slug}.json"
+        try:
+            existing = json.loads(path.read_text())
+        except (OSError, ValueError):
+            existing = None
+        request = {"slug": slug, "query": query, "docs_url": parse_query(query)[2], "state": "queued",
+                   "note": "Waiting for the research agent to pick this up.",
+                   "requested_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+        if existing is None or existing.get("state") == "failed":  # repeat searches join a live request; failed ones restart
+            write_atomic(path, request)
+        else:
+            request = existing
+        if conn and not start_job(request, conn):
+            return self.send_json(503, {"error": "The research agent is busy. Try again in a minute."})
         return self.send_json(202, {"found": False, "slug": slug})
 
 
@@ -214,7 +284,50 @@ def self_check():
     assert parse_query("linear.app")[2] is None
     assert not SLUG.match("../etc") and not SLUG.match("")
     check_connect_endpoint()
+    check_pipeline()
     print("SELF_CHECK_PASSED")
+
+
+def check_pipeline():
+    """run_job with stubbed researchers and pages: pass saves the guide, failure is reported, the key never lands on disk."""
+    import tempfile
+    global GUIDES, QUEUE
+    saved = (GUIDES, QUEUE, dict(research.RESEARCHERS), validate.fetch)
+    tmp = Path(tempfile.mkdtemp())
+    GUIDES, QUEUE = tmp / "guides", tmp / "queue"
+    GUIDES.mkdir(); QUEUE.mkdir()
+    page = "<p>Click Register application.</p>"
+    validate.fetch = lambda url: page
+    guide = {"slug": "acme", "name": "Acme", "domains": ["docs.acme.com"], "summary": "s", "gaps": [],
+             "effort": {"assumptions": "a", "wait": {"estimate": "None", "basis": "b"}},
+             "steps": [{"id": "x", "title": "t", "detail": "d", "evidence": "documented",
+                        "time": {"kind": "estimate", "phase": "setup", "min_minutes": 1, "max_minutes": 2, "basis": "b"},
+                        "source": {"url": "https://docs.acme.com/o", "quote": "Click Register application."}}]}
+    seen = []
+    def fake(conn, request, review):
+        seen.append(review(json.loads(json.dumps(guide))))
+        return json.loads(json.dumps(guide)), []
+    try:
+        key = "sk-test-" + secrets.token_hex(6)
+        conn = {"provider": "anthropic", "model": "m", "api_key": key}
+        research.RESEARCHERS["anthropic"] = fake
+        write_atomic(QUEUE / "acme.json", {"slug": "acme", "state": "queued"})
+        run_job({"slug": "acme", "query": "Acme"}, conn)
+        stored = (GUIDES / "acme.json").read_text()
+        assert seen == [[]] and json.loads(stored)["verification"]["status"] == "complete"
+        assert not (QUEUE / "acme.json").exists() and key not in stored
+        def boom(conn, request, review):
+            raise research.ResearchFailed("The model declined this request.")
+        research.RESEARCHERS["anthropic"] = boom
+        write_atomic(QUEUE / "beta.json", {"slug": "beta", "state": "queued"})
+        run_job({"slug": "beta", "query": "Beta"}, conn)
+        failed = json.loads((QUEUE / "beta.json").read_text())
+        assert failed["state"] == "failed" and "declined" in failed["note"] and key not in json.dumps(failed)
+        assert not JOBS
+    finally:
+        GUIDES, QUEUE = saved[0], saved[1]
+        research.RESEARCHERS.clear(); research.RESEARCHERS.update(saved[2])
+        validate.fetch = saved[3]
 
 
 def check_connect_endpoint():
