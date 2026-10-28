@@ -17,7 +17,8 @@ def normalize(text):
     Whitespace is dropped entirely because removed tags leave unpredictable spacing.
     """
     text = unicodedata.normalize("NFKC", html.unescape(text)).translate(_QUOTES).casefold()
-    return re.sub(r"\s+", "", text)
+    # Web fetch tools return pages as Markdown, so quotes can carry `code` or **bold** marks the HTML text lacks.
+    return re.sub(r"[\s`*]+", "", text)
 
 
 def page_text(raw_html):
@@ -149,6 +150,7 @@ def self_check():
     doms = ["docs.example.com"]
     assert check_claim({"url": "https://docs.example.com/good", "quote": "Click Register application."}, doms, get)[0]
     assert check_claim({"url": "https://docs.example.com/good", "quote": '"Use it"'}, doms, get)[0]
+    assert check_claim({"url": "https://docs.example.com/good", "quote": "Click **Register `application`**."}, doms, get)[0], "Markdown marks are ignored"
     assert not check_claim({"url": "https://docs.example.com/good", "quote": "var x"}, doms, get)[0], "script text must not count"
     assert not check_claim({"url": "https://evil-docs.example.com.attacker.io/good", "quote": "Click"}, doms, get)[0]
     assert not check_claim({"url": "http://docs.example.com/good", "quote": "Click"}, doms, get)[0], "https only"
