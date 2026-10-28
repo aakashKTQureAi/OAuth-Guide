@@ -28,11 +28,43 @@ function checkNote(result) {
   return el("p", { class: "check fail" }, `Source check failed: ${result.reason}. Treat this step as unverified.`);
 }
 
+function fmtMinutes(m) {
+  if (m < 1) return `${Math.round(m * 60)} s`;
+  if (m < 90) return `${Math.round(m)} min`;
+  return `${Math.round(m / 30) / 2} h`;
+}
+
+function fmtRange(lo, hi) {
+  return lo === hi ? fmtMinutes(lo) : `${fmtMinutes(lo)}–${fmtMinutes(hi)}`;
+}
+
+function timeNote(t) {
+  if (!t) return null;
+  const label = t.kind === "measured" ? `Measured ${t.measured_on}` : "Estimate, not measured";
+  return el("p", { class: "time" },
+    el("span", { class: `badge ${t.kind === "measured" ? "ok" : "neutral"}` }, `⏱ ${fmtRange(t.min_minutes, t.max_minutes)}`),
+    ` ${label} — ${t.basis}`);
+}
+
+function activeCard(g) {
+  const times = g.steps.map(s => s.time).filter(Boolean);
+  if (!times.length) return effortCard("Your active effort", g.effort?.active);
+  const sum = (kind, key) => times.filter(t => !kind || t.kind === kind).reduce((n, t) => n + t[key], 0);
+  const measured = times.filter(t => t.kind === "measured");
+  return el("div", { class: "card" },
+    el("div", { class: "label" }, "Your active effort"),
+    el("div", { class: "value" }, fmtRange(sum(null, "min_minutes"), sum(null, "max_minutes"))),
+    el("p", { class: "hint" },
+      measured.length ? `${fmtRange(sum("measured", "min_minutes"), sum("measured", "max_minutes"))} measured in a timed run; the rest is an estimate, not measured. ` : "Estimate, not measured. ",
+      `Assumes ${g.effort?.assumptions || "nothing stated"}.`));
+}
+
 function effortCard(label, item) {
   return el("div", { class: "card" },
     el("div", { class: "label" }, label),
     el("div", { class: "value" }, item?.estimate || "Unknown"),
-    el("p", { class: "hint" }, item?.basis || "No supported estimate."));
+    el("p", { class: "hint" }, item?.basis || "No supported estimate."),
+    item?.source ? sourceLink(item.source) : null);
 }
 
 function render(g) {
@@ -54,7 +86,7 @@ function render(g) {
         el("h3", {}, `${i + 1}. ${s.title}`),
         el("span", { class: `badge ${tone}`, title: why }, label),
         s.actor ? el("span", { class: "badge neutral" }, s.actor) : null),
-      el("p", {}, s.detail), settings, test, checkNote(results[s.id]), sourceLink(s.source));
+      el("p", {}, s.detail), timeNote(s.time), settings, test, checkNote(results[s.id]), sourceLink(s.source));
   });
 
   const prereqs = (g.prerequisites || []).map((p, i) =>
@@ -73,7 +105,8 @@ function render(g) {
       el("span", { class: `badge ${status === "complete" ? "ok" : "gap"}` }, status === "complete" ? "All steps source-checked" : status === "incomplete" ? "Incomplete" : "Not checked"),
       el("span", { class: "hint" }, v ? `Checked ${v.checked_at} · ${v.method}` : "No evidence check recorded.")),
     el("p", { class: "lede" }, g.summary),
-    el("section", { class: "cards" }, effortCard("Your active effort", g.effort?.active), effortCard("Provider waiting time", g.effort?.wait)),
+    el("section", { class: "cards" }, activeCard(g),
+      el("div", {}, effortCard("Provider waiting time", g.effort?.wait), g.effort?.wait?.source ? checkNote(results["provider-wait"]) : null)),
     prereqs.length ? el("section", {}, el("h2", {}, "Before you start"), el("ul", { class: "plain" }, prereqs)) : null,
     el("section", {}, el("h2", {}, "Steps"), el("ol", { class: "steps" }, steps)),
     el("section", {}, el("h2", {}, "Gaps and open questions"),

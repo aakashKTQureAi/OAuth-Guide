@@ -94,3 +94,4 @@ ol.progress li { margin-bottom: 6px; }
 ol.progress li.done { color: var(--ok); }
 ol.progress li.done::after { content: " ✓"; }
 ol.progress li.active { color: var(--text); font-weight: 600; }
+p.time { font-size: 14px; color: var(--muted); margin: 6px 0; }

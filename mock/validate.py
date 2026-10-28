@@ -57,6 +57,31 @@ def claims(guide):
         yield f"prerequisite-{i + 1}", item
     for step in guide.get("steps", []):
         yield step["id"], step
+    wait = guide.get("effort", {}).get("wait", {})
+    if wait.get("source"):
+        yield "provider-wait", wait
+
+
+def time_errors(guide):
+    """Malformed time data is an authoring error, not evidence: it never changes status."""
+    errors = []
+    for step in guide.get("steps", []):
+        t = step.get("time")
+        if t is None:
+            continue
+        lo, hi = t.get("min_minutes"), t.get("max_minutes")
+        if t.get("kind") not in ("measured", "estimate"):
+            errors.append(f"{step['id']}: time.kind must be measured or estimate")
+        elif not (isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and 0 <= lo <= hi):
+            errors.append(f"{step['id']}: time needs 0 <= min_minutes <= max_minutes")
+        elif not t.get("basis", "").strip():
+            errors.append(f"{step['id']}: time needs a basis")
+        elif t["kind"] == "measured" and not t.get("measured_on"):
+            errors.append(f"{step['id']}: measured time needs measured_on")
+    if any(s.get("time", {}).get("kind") == "estimate" for s in guide.get("steps", [])) \
+            and not guide.get("effort", {}).get("assumptions", "").strip():
+        errors.append("effort.assumptions is required when any step has an estimate")
+    return errors
 
 
 def verify(guide, get_page):
@@ -109,6 +134,19 @@ def self_check():
     assert verify(guide, get)["status"] == "complete"
     guide["gaps"] = [{"text": "terms", "critical": True}]
     assert verify(guide, get)["status"] == "incomplete", "critical gap keeps guide incomplete"
+    guide["gaps"] = []
+    guide["steps"][0]["time"] = {"kind": "estimate", "min_minutes": 30, "max_minutes": 60, "basis": "judgment"}
+    assert time_errors(guide) == ["effort.assumptions is required when any step has an estimate"]
+    guide["effort"] = {"assumptions": "experienced developer"}
+    guide["steps"][1]["time"] = {"kind": "measured", "min_minutes": 0.6, "max_minutes": 0.6, "basis": "timed run"}
+    assert time_errors(guide) == ["b: measured time needs measured_on"]
+    guide["steps"][1]["time"]["measured_on"] = "2026-10-28"
+    guide["steps"][0]["time"]["min_minutes"] = 90
+    assert time_errors(guide) == ["a: time needs 0 <= min_minutes <= max_minutes"]
+    guide["steps"][0]["time"]["min_minutes"] = 30
+    assert not time_errors(guide) and verify(guide, get)["status"] == "complete", "valid times never change status"
+    guide["effort"]["wait"] = {"estimate": "Days", "source": {"url": "https://docs.example.com/good", "quote": "Click Delete"}}
+    assert verify(guide, get)["status"] == "incomplete", "a sourced wait is checked like any claim"
     print("SELF_CHECK_PASSED")
 
 
@@ -121,7 +159,12 @@ def main(path):
         f.write("\n")
     for r in result["results"]:
         print(("PASS " if r["ok"] else "FAIL ") + f"{r['id']}: {r['reason']}")
+    errors = time_errors(guide)
+    for e in errors:
+        print(f"TIME ERROR {e}")
     print(f"STATUS {result['status']}")
+    if errors:
+        return 1
     return 0 if result["status"] == "complete" else 2
 
 
