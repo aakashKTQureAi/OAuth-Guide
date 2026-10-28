@@ -9,7 +9,7 @@
 <body>
   <header class="top">
     <a class="brand" href="/">OAuth Guide</a>
-    <span class="chip"><span class="dot"></span>Agent: Claude (this session)</span>
+    <span class="chip" id="conn-chip"></span>
   </header>
   <main>
     <p class="eyebrow">No saved guide yet</p>
@@ -21,19 +21,43 @@
       <li data-state="validating">Checking every quote against its source</li>
       <li data-state="ready">Guide saved to the library</li>
     </ol>
-    <p class="card" id="note" aria-live="polite">Waiting for the research agent…</p>
+    <p class="elapsed"><span id="elapsed">0:00</span> elapsed · usually 2–5 minutes</p>
+    <p class="card" id="note">Waiting for the research agent…</p>
+    <ol class="activity" id="activity" aria-live="polite" aria-label="Research activity"></ol>
     <p id="retry-row" hidden><button type="button" id="retry">Try again</button> <a href="/">Search for another app</a></p>
   </main>
   <script>
     const slug = new URLSearchParams(location.search).get("slug") || "";
     const order = ["queued", "researching", "validating", "ready"];
     document.getElementById("title").textContent = `Researching ${slug}…`;
+    fetch("/api/connection", { cache: "no-store" }).then(r => r.json()).then(c => {
+      const names = { anthropic: "Anthropic", openai: "OpenAI", portkey: "Portkey" };
+      document.getElementById("conn-chip").textContent = c.connected ? `Model: ${names[c.provider]} · ${c.model}` : "Local research agent";
+    });
+    let startedAt = null;
+    setInterval(() => {
+      if (!startedAt) return;
+      const sec = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      document.getElementById("elapsed").textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+    }, 1000);
+    function showActivity(items) {
+      const list = document.getElementById("activity");
+      if (list.childElementCount === items.length) return;
+      list.replaceChildren(...items.map(a => {
+        const li = document.createElement("li");
+        li.textContent = a.text;  // text only: activity can include page addresses from the web
+        return li;
+      }));
+      list.lastElementChild?.scrollIntoView({ block: "nearest" });
+    }
     async function poll() {
       const res = await fetch(`/api/status/${encodeURIComponent(slug)}`, { cache: "no-store" });
       const status = await res.json();
       if (status.state === "ready") { location.href = `/guide.html?slug=${encodeURIComponent(slug)}`; return; }
       if (!res.ok) { document.getElementById("note").textContent = "No research request found. Start from the search page."; return; }
       if (status.state === "failed") {
+        showActivity(status.activity || []);
+        startedAt = null;
         document.getElementById("title").textContent = `Could not research ${slug}`;
         document.getElementById("note").textContent = status.note || "Research failed.";
         document.getElementById("retry-row").hidden = false;
@@ -47,6 +71,8 @@
         };
         return;
       }
+      if (status.requested_at && !startedAt) startedAt = Date.parse(status.requested_at);
+      showActivity(status.activity || []);
       const at = order.indexOf(status.state);
       document.querySelectorAll("#progress li").forEach((li, i) => li.className = i < at ? "done" : i === at ? "active" : "");
       document.getElementById("note").textContent = status.note || "";

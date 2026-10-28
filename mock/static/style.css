@@ -109,3 +109,8 @@ section.connect summary { cursor: pointer; color: var(--accent); font-size: 15px
 .conn-form label[hidden] { display: none; }
 .conn-portkey { display: grid; gap: 10px; }
 .conn-portkey[hidden] { display: none; }
+p.elapsed { font-size: 14px; color: var(--muted); margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+ol.activity { list-style: none; padding: 0; margin: 12px 0 0; font-size: 14px; display: grid; gap: 6px; max-height: 320px; overflow-y: auto; }
+ol.activity li { padding-left: 18px; position: relative; color: var(--muted); overflow-wrap: anywhere; }
+ol.activity li::before { content: "●"; position: absolute; left: 0; font-size: 10px; top: 3px; color: var(--accent); }
+ol.activity li:last-child { color: var(--text); }

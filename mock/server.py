@@ -51,14 +51,28 @@ def session_drop(sid):
         SESSIONS.pop(sid, None)
 
 
-def update_request(slug, **fields):
+REQUEST_LOCK = threading.Lock()
+MAX_ACTIVITY = 40
+
+
+def update_request(slug, activity=None, **fields):
+    """Merge fields into a request file; activity lines (and notes) also go to the visitor's live feed."""
     path = QUEUE / f"{slug}.json"
-    try:
-        data = json.loads(path.read_text())
-    except (OSError, ValueError):
-        return
-    data.update(fields)
-    write_atomic(path, data)
+    with REQUEST_LOCK:
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            return
+        data.update(fields)
+        line = activity or fields.get("note")
+        if line:
+            now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+            data["activity"] = (data.get("activity") or [])[-(MAX_ACTIVITY - 1):] + [{"t": now, "text": str(line)[:200]}]
+        write_atomic(path, data)
+
+
+def progress_for(slug):
+    return lambda text: update_request(slug, activity=text)
 
 
 def write_atomic(path, data):
@@ -369,6 +383,12 @@ def check_pipeline():
         failed = json.loads((QUEUE / "beta.json").read_text())
         assert failed["state"] == "failed" and "declined" in failed["note"] and key not in json.dumps(failed)
         assert not JOBS
+        write_atomic(QUEUE / "feed.json", {"slug": "feed", "state": "researching"})
+        say = progress_for("feed")
+        for i in range(MAX_ACTIVITY + 5):
+            say(f"line {i}")
+        feed = json.loads((QUEUE / "feed.json").read_text())["activity"]
+        assert len(feed) == MAX_ACTIVITY and feed[-1]["text"] == f"line {MAX_ACTIVITY + 4}" and feed[0]["t"]
     finally:
         GUIDES, QUEUE = saved[0], saved[1]
         research.RESEARCHERS.clear(); research.RESEARCHERS.update(saved[2])
