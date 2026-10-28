@@ -1,0 +1,262 @@
+{
+  "slug": "github",
+  "name": "GitHub (OAuth App)",
+  "aliases": [
+    "github",
+    "github.com",
+    "docs.github.com",
+    "github oauth",
+    "github oauth app"
+  ],
+  "domains": [
+    "docs.github.com",
+    "github.blog"
+  ],
+  "summary": "Register a GitHub OAuth App, send users through the authorization code flow with state and PKCE, and call the API on their behalf. Steps marked Authorization tested were exercised end to end on 2026-10-28 with a local loopback callback and no scopes.",
+  "effort": {
+    "active": {
+      "estimate": "Not measured",
+      "basis": "Our local test was not timed, so no effort figure is claimed."
+    },
+    "wait": {
+      "estimate": "None observed",
+      "basis": "Registration completed immediately in our test. No official page we checked describes a review step for registering an OAuth App."
+    }
+  },
+  "prerequisites": [
+    {
+      "text": "A GitHub personal account, or admin access to the organization that will own the app.",
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app",
+        "quote": "You can create and register an OAuth app under your personal account or under any organization you have administrative access to."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "choose-app-type",
+      "title": "Confirm an OAuth App is the right choice",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "GitHub recommends a GitHub App when you need narrower access. Pick an OAuth App only if its broader scope model is acceptable for your use case.",
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/best-practices-for-creating-an-oauth-app",
+        "quote": "GitHub Apps use fine-grained permissions, give the user more control over which repositories the app can access, and use short-lived tokens."
+      }
+    },
+    {
+      "id": "register",
+      "title": "Register the OAuth App",
+      "actor": "Developer",
+      "evidence": "auth-tested",
+      "detail": "Go to Settings → Developer settings → OAuth apps → New OAuth App (first-time accounts see “Register a new application”). Fill in the fields below and click Register application. Values shown are the ones we tested locally; replace them with your agent application's real URLs in production.",
+      "settings": [
+        {
+          "field": "Application name",
+          "value": "OAuth Guide validation",
+          "explain": "Shown to users on the consent screen. In production use your recognizable product name."
+        },
+        {
+          "field": "Homepage URL",
+          "value": "http://127.0.0.1:8765",
+          "explain": "Local test only. Production: your agent application's public site, e.g. https://your-agent.example/ (illustrative, not tested)."
+        },
+        {
+          "field": "Authorization callback URL",
+          "value": "http://127.0.0.1:8765/callback",
+          "explain": "Where GitHub sends the user back with the code. Local test only. Production: your backend's callback endpoint (illustrative, not tested). Up to 10 callback URLs are allowed."
+        },
+        {
+          "field": "Enable Device Flow",
+          "value": "Off",
+          "explain": "Only for headless apps such as CLIs. Leave off for a web callback flow."
+        }
+      ],
+      "test_record": {
+        "date": "2026-10-28",
+        "result": "Registration succeeded and the app was used for the full flow below.",
+        "limits": "Loopback callback on one machine; production URLs not tested."
+      },
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app",
+        "quote": "In \"Authorization callback URL\", type the callback URL of your app."
+      }
+    },
+    {
+      "id": "wildcard",
+      "title": "Turn wildcard matching off unless you need it",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "Wildcard matching lets GitHub send codes to any subdomain or sub-path of your callback. GitHub's changelog says single-callback apps have it enabled, so check the setting after registering. Our test ran with it off.",
+      "source": {
+        "url": "https://github.blog/changelog/2026-08-14-multiple-redirect-uris-and-token-refresh-for-oauth-apps/",
+        "quote": "Apps with only one redirect URI have wildcard matching enabled."
+      }
+    },
+    {
+      "id": "client-secret",
+      "title": "Generate a client secret and store it server-side",
+      "actor": "Developer",
+      "evidence": "console-observed",
+      "detail": "On the app page, click Generate a new client secret. In our run GitHub asked for a Confirm access (sudo) check before showing it. Copy it straight into your backend's secret store; never put it in chat, URLs, logs or front-end code.",
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/best-practices-for-creating-an-oauth-app",
+        "quote": "Client secrets are required to generate access tokens for your app, unless your app uses the device flow."
+      }
+    },
+    {
+      "id": "scopes",
+      "title": "Request only the scopes you need",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "Requesting no scope gives read-only access to public data, which is what we tested. Reading private repository contents needs the repo scope, which also grants write access; an OAuth App cannot narrow it to read-only.",
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps",
+        "quote": "repo Grants full access to public and private repositories including read and write access to code"
+      }
+    },
+    {
+      "id": "authorize",
+      "title": "Send the user to GitHub with state and PKCE",
+      "actor": "Your app",
+      "evidence": "auth-tested",
+      "detail": "Redirect to https://github.com/login/oauth/authorize with client_id, redirect_uri, an unguessable state and an S256 code_challenge. When the user returns, compare state before doing anything else.",
+      "test_record": {
+        "date": "2026-10-28",
+        "result": "Callback received; state matched; S256 PKCE used; no scopes requested.",
+        "limits": "Single user, single run."
+      },
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
+        "quote": "If the states don't match, then a third party created the request, and you should abort the process."
+      }
+    },
+    {
+      "id": "exchange",
+      "title": "Exchange the code for a token",
+      "actor": "Your backend",
+      "evidence": "auth-tested",
+      "detail": "POST client_id, client_secret, code, redirect_uri and code_verifier to the token endpoint with Accept: application/json.",
+      "test_record": {
+        "date": "2026-10-28",
+        "result": "HTTP 200; granted scopes empty; an expiring access token and a refresh token were returned.",
+        "limits": "Token values were never printed or stored; refresh not exercised."
+      },
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
+        "quote": "Exchange this code for an access token: POST https://github.com/login/oauth/access_token"
+      }
+    },
+    {
+      "id": "api-call",
+      "title": "Call the API as the user",
+      "actor": "Your backend",
+      "evidence": "auth-tested",
+      "detail": "Send Authorization: Bearer <token>. We made exactly one read: GET https://api.github.com/user.",
+      "test_record": {
+        "date": "2026-10-28",
+        "result": "GET /user returned HTTP 200 with an empty X-OAuth-Scopes header.",
+        "limits": "Read-only, public data only."
+      },
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
+        "quote": "The access token allows you to make requests to the API on a behalf of a user."
+      }
+    },
+    {
+      "id": "refresh",
+      "title": "Handle token expiry with refresh tokens",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "With expiring tokens on, store the refresh token securely and swap it for a new token pair before or after the access token expires.",
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
+        "quote": "The access token expires after eight hours, and the refresh token expires after six months without use."
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "text": "Token refresh and revocation were not exercised.",
+      "critical": false,
+      "next_action": "Run a refresh and a revoke against the test app."
+    },
+    {
+      "text": "Organization-owned apps and organization OAuth access restrictions were not researched.",
+      "critical": false,
+      "next_action": "Check GitHub docs on organization OAuth app access policies."
+    },
+    {
+      "text": "Production callback URLs were not tested; only a local loopback callback was.",
+      "critical": false,
+      "next_action": "Repeat the flow against a deployed callback."
+    }
+  ],
+  "verification": {
+    "checked_at": "2026-10-28",
+    "method": "plain HTTPS fetch, tags stripped, normalized text match",
+    "status": "complete",
+    "results": [
+      {
+        "id": "prerequisite-1",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app"
+      },
+      {
+        "id": "choose-app-type",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/best-practices-for-creating-an-oauth-app"
+      },
+      {
+        "id": "register",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app"
+      },
+      {
+        "id": "wildcard",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://github.blog/changelog/2026-08-14-multiple-redirect-uris-and-token-refresh-for-oauth-apps/"
+      },
+      {
+        "id": "client-secret",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/best-practices-for-creating-an-oauth-app"
+      },
+      {
+        "id": "scopes",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps"
+      },
+      {
+        "id": "authorize",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
+      },
+      {
+        "id": "exchange",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
+      },
+      {
+        "id": "api-call",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
+      },
+      {
+        "id": "refresh",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
+      }
+    ]
+  }
+}
