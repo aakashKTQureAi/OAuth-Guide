@@ -173,6 +173,24 @@ OPENAI_SYSTEM = SYSTEM.replace("then call submit_guide exactly once", "then retu
     "Fetch every page you cite.", "Open every page you cite with web search.")
 
 
+def describe_openai_event(event):
+    item = getattr(event, "item", None)
+    if event.type == "response.output_item.added" and getattr(item, "type", "") == "reasoning":
+        return "Thinking"
+    if event.type == "response.output_item.added" and getattr(item, "type", "") == "message":
+        return "Writing the guide"
+    if event.type == "response.output_item.done" and getattr(item, "type", "") == "web_search_call":
+        action = getattr(item, "action", None)
+        kind = getattr(action, "type", "")
+        if kind == "search" and (action.query or action.queries):
+            return f'Searching: "{(action.query or action.queries[0])[:120]}"'
+        if kind == "open_page" and action.url:
+            return f"Reading {_short_url(action.url)}"
+        if kind == "find" and action.url:
+            return f'Looking for "{(action.pattern or "")[:60]}" on {_short_url(action.url)}'
+    return None
+
+
 def _openai_sources(resp, fetched):
     for item in resp.output:
         if item.type == "web_search_call":
@@ -192,10 +210,15 @@ def research_openai(conn, request, review, client=None, progress=lambda text: No
     fetched, prompt, previous = set(), user_prompt(request), None
     for attempt in range(2):
         try:
-            resp = client.responses.create(
-                model=conn["model"], instructions=OPENAI_SYSTEM, input=prompt, previous_response_id=previous,
-                tools=[{"type": "web_search"}], include=["web_search_call.action.sources"],
-                text={"format": {"type": "json_schema", "name": "oauth_guide", "schema": GUIDE_SCHEMA, "strict": True}})
+            with client.responses.stream(
+                    model=conn["model"], instructions=OPENAI_SYSTEM, input=prompt, previous_response_id=previous,
+                    tools=[{"type": "web_search"}], include=["web_search_call.action.sources"],
+                    text={"format": {"type": "json_schema", "name": "oauth_guide", "schema": GUIDE_SCHEMA, "strict": True}}) as events:
+                for event in events:
+                    line = describe_openai_event(event)
+                    if line:
+                        progress(line)
+                resp = events.get_final_response()
         except Exception as exc:  # provider errors become a safe message; the key is never in it
             raise ResearchFailed(f"The model call failed ({type(exc).__name__}).") from None
         _openai_sources(resp, fetched)
@@ -277,21 +300,32 @@ def check_openai():
              "prerequisites": [], "gaps": [], "steps": []}
     out = [NS(type="web_search_call", action=NS(sources=[NS(url="https://docs.acme.com/a")])),
            NS(type="message", content=[NS(annotations=[NS(type="url_citation", url="https://docs.acme.com/b")])])]
-    calls = []
-    def create(**kw):
+    calls, lines = [], []
+    class Stream:
+        def __init__(self, resp, events): self.resp, self.events = resp, events
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def __iter__(self): return iter(self.events)
+        def get_final_response(self): return self.resp
+    def stream(**kw):
         calls.append(kw)
-        return NS(id=f"r{len(calls)}", output=out, output_text=json.dumps(draft))
-    client = NS(responses=NS(create=create))
+        events = [NS(type="response.output_item.added", item=NS(type="reasoning")),
+                  NS(type="response.output_item.done", item=NS(type="web_search_call", action=NS(type="search", query="acme oauth", queries=None))),
+                  NS(type="response.output_item.done", item=NS(type="web_search_call", action=NS(type="open_page", url="https://docs.acme.com/a#x"))),
+                  NS(type="response.output_item.added", item=NS(type="message"))] if len(calls) == 1 else []
+        return Stream(NS(id=f"r{len(calls)}", output=out, output_text=json.dumps(draft)), events)
+    client = NS(responses=NS(stream=stream))
     reviews = []
     guide, fetched = research_openai({"provider": "openai", "model": "m"}, {"slug": "acme", "query": "Acme"},
-                                     lambda g, f: reviews.append(g) or (["bad quote"] if len(reviews) == 1 else []), client)
+                                     lambda g, f: reviews.append(g) or (["bad quote"] if len(reviews) == 1 else []), client, lines.append)
+    assert lines == ["Thinking", 'Searching: "acme oauth"', "Reading docs.acme.com/a", "Writing the guide"], lines
     assert len(calls) == 2 and calls[1]["previous_response_id"] == "r1" and "bad quote" in calls[1]["input"]
     assert calls[0]["text"]["format"]["strict"] is True and calls[0]["tools"] == [{"type": "web_search"}]
     assert fetched == ["https://docs.acme.com/a", "https://docs.acme.com/b"] and guide["generated_by"]["provider"] == "openai"
     assert "submit_guide" not in OPENAI_SYSTEM
-    bad = lambda **kw: NS(id="x", output=[], output_text="not json")
+    bad = lambda **kw: Stream(NS(id="x", output=[], output_text="not json"), [])
     try:
-        research_openai({"provider": "openai", "model": "m"}, {"slug": "a", "query": "a"}, lambda g, f: [], NS(responses=NS(create=bad)))
+        research_openai({"provider": "openai", "model": "m"}, {"slug": "a", "query": "a"}, lambda g, f: [], NS(responses=NS(stream=bad)))
         raise AssertionError("invalid JSON must fail")
     except ResearchFailed:
         pass
