@@ -15,13 +15,14 @@
   ],
   "summary": "Create an OAuth 2.0 (3LO) integration in the Atlassian developer console, add Jira scopes and a callback, run the authorization code flow, then find the user's site (cloudid) before calling the Jira API. Our hands-on check stopped at the developer-terms checkbox, so later steps are documentation-backed only.",
   "effort": {
-    "active": {
-      "estimate": "Not measured",
-      "basis": "No end-to-end run was completed, so no effort figure is claimed."
-    },
+    "assumptions": "an experienced developer, an existing web backend reachable over HTTPS with a secret store and a database for tokens, and a standard OAuth client library. Excludes customer admin approvals, security review and production rollout",
     "wait": {
-      "estimate": "Unknown",
-      "basis": "Sharing is a console toggle per the docs; no page we checked states a review wait. Marketplace listing is separate and was not researched."
+      "estimate": "None",
+      "basis": "Creating the integration and enabling sharing are console actions with no Atlassian review described. A Marketplace listing is optional and not part of OAuth setup.",
+      "source": {
+        "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
+        "quote": "Enable sharing using the toggle switch in the Enable sharing section."
+      }
     }
   },
   "prerequisites": [
@@ -50,7 +51,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/security-for-other-integrations/",
         "quote": "OAuth 2.0 authorization code grants (3LO) : This is the recommended method."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 5,
+        "max_minutes": 15,
+        "basis": "Reading Atlassian's security guidance and confirming 3LO."
+      },
+      "who": "agent + you",
+      "handoff": "You decide; the agent can summarize the options."
     },
     {
       "id": "single-app",
@@ -61,7 +71,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "Build a single, distributable 3LO app for your integration."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 5,
+        "max_minutes": 15,
+        "basis": "Deciding one shared app versus per-customer setup."
+      },
+      "who": "agent + you",
+      "handoff": "You decide the distribution model."
     },
     {
       "id": "create",
@@ -72,7 +91,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "In the Developer console, select the Create dropdown and choose OAuth 2.0 integration to create an OAuth 2.0 (3LO) app."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 3,
+        "max_minutes": 10,
+        "basis": "Console form plus reading the developer terms."
+      },
+      "who": "agent + you",
+      "handoff": "The account owner must review and accept Atlassian's developer terms."
     },
     {
       "id": "grant-type",
@@ -95,7 +123,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "Resource-level grant: The user’s consent is limited to the specific site(s) they select on the consent screen."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 2,
+        "max_minutes": 5,
+        "basis": "One choice in the create form."
+      },
+      "who": "agent + you",
+      "handoff": "You choose how far user consent reaches."
     },
     {
       "id": "scopes",
@@ -106,7 +143,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/scopes-for-oauth-2-3LO-and-forge-apps/",
         "quote": "Consult the Jira Cloud platform REST API documentation to determine the scope needed for each operation and create a list of scopes."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 15,
+        "max_minutes": 60,
+        "basis": "Mapping each Jira endpoint you call to its required scope."
+      },
+      "who": "agent + you",
+      "handoff": "You confirm the operations your product needs."
     },
     {
       "id": "callback",
@@ -117,7 +163,15 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "When you implement OAuth 2.0 (3LO) in your app (see next section), the redirect_uri must match this URL."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 2,
+        "max_minutes": 5,
+        "basis": "One console field."
+      },
+      "who": "agent"
     },
     {
       "id": "secret",
@@ -128,7 +182,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "client_secret : ( required ) Set this to the Secret for your app."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 2,
+        "max_minutes": 5,
+        "basis": "Copying two values into your secret store."
+      },
+      "who": "agent + you",
+      "handoff": "The secret goes straight into your secret store; keep it out of chats and logs."
     },
     {
       "id": "authorize",
@@ -139,7 +202,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "Set this to a value that is associated with the user you are directing to the authorization URL"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 60,
+        "max_minutes": 180,
+        "basis": "Login redirect with audience, scopes and a user-bound state."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "exchange",
@@ -150,7 +222,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "If successful, the user will be redirected to the app's callback URL, with an authorization code provided as a query parameter called code."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 120,
+        "max_minutes": 240,
+        "basis": "Callback route, token exchange and encrypted token storage."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "cloudid",
@@ -161,7 +242,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "Make a GET request to https://api.atlassian.com/oauth/token/accessible-resources passing the access token as a bearer token in the header of the request."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 30,
+        "max_minutes": 90,
+        "basis": "Fetching accessible resources and letting the user pick a site."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "api-call",
@@ -172,7 +262,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "Jira apps: https://api.atlassian.com/ex/jira/{cloudid}/{api}"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 30,
+        "max_minutes": 90,
+        "basis": "Building api.atlassian.com/ex/jira URLs and handling 401/403."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "refresh",
@@ -183,7 +282,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "To get a refresh token in your initial authorization flow, add offline_access to the scope parameter of the authorization URL."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 60,
+        "max_minutes": 180,
+        "basis": "Rotating refresh tokens: store the new one after every use."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "sharing",
@@ -194,7 +302,16 @@
       "source": {
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/",
         "quote": "If you want to distribute your app to other users, you must enable sharing."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 1,
+        "max_minutes": 3,
+        "basis": "One toggle."
+      },
+      "who": "agent + you",
+      "handoff": "Done by the signed-in app owner."
     }
   ],
   "gaps": [
@@ -212,6 +329,11 @@
       "text": "Whether the grant type can be changed after creation is unknown.",
       "critical": false,
       "next_action": "Check in the console after creation."
+    },
+    {
+      "text": "Whether customer Jira admins must approve third-party OAuth apps before their users can connect was not researched.",
+      "critical": false,
+      "next_action": "Check Atlassian admin docs on app access policies."
     }
   ],
   "verification": {
@@ -308,7 +430,17 @@
         "ok": true,
         "reason": "quote found on official page",
         "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/"
+      },
+      {
+        "id": "provider-wait",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps/"
       }
     ]
+  },
+  "difficulty": {
+    "level": "moderate",
+    "reason": "No Atlassian review to create or share the integration, but you must accept developer terms, choose a grant type and per-endpoint scopes, and look up each user's site (cloudid) before any API call."
   }
 }
