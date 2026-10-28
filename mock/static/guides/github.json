@@ -14,14 +14,11 @@
   ],
   "summary": "Register a GitHub OAuth App, send users through the authorization code flow with state and PKCE, and call the API on their behalf. Steps marked Authorization tested were exercised end to end on 2026-10-28 with a local loopback callback and no scopes.",
   "effort": {
-    "active": {
-      "estimate": "Not measured",
-      "basis": "Our local test was not timed, so no effort figure is claimed."
-    },
     "wait": {
-      "estimate": "None observed",
-      "basis": "Registration completed immediately in our test. No official page we checked describes a review step for registering an OAuth App."
-    }
+      "estimate": "None",
+      "basis": "The app worked immediately in two runs on 2026-10-28, and no GitHub page we checked describes a review before users can authorize an OAuth App."
+    },
+    "assumptions": "an experienced developer, an existing web backend reachable over HTTPS with a secret store and a database for tokens, and a standard OAuth client library. Excludes organization approvals, security review and production rollout"
   },
   "prerequisites": [
     {
@@ -42,7 +39,16 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/best-practices-for-creating-an-oauth-app",
         "quote": "GitHub Apps use fine-grained permissions, give the user more control over which repositories the app can access, and use short-lived tokens."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "min_minutes": 10,
+        "max_minutes": 30,
+        "basis": "Reading GitHub's OAuth App vs GitHub App guidance and deciding.",
+        "phase": "setup"
+      },
+      "who": "agent + you",
+      "handoff": "You choose; the agent can summarize the tradeoff."
     },
     {
       "id": "register",
@@ -80,7 +86,17 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app",
         "quote": "In \"Authorization callback URL\", type the callback URL of your app."
-      }
+      },
+      "time": {
+        "kind": "measured",
+        "min_minutes": 0.62,
+        "max_minutes": 0.62,
+        "measured_on": "2026-10-28",
+        "basis": "Timed run: 37 s to fill and submit the form, with Claude driving Chrome. A person reading each field will be slower.",
+        "phase": "setup"
+      },
+      "who": "agent + you",
+      "handoff": "Must happen in a browser signed in to the GitHub account that will own the app."
     },
     {
       "id": "wildcard",
@@ -91,7 +107,15 @@
       "source": {
         "url": "https://github.blog/changelog/2026-08-14-multiple-redirect-uris-and-token-refresh-for-oauth-apps/",
         "quote": "Apps with only one redirect URI have wildcard matching enabled."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "min_minutes": 1,
+        "max_minutes": 5,
+        "basis": "Checking one setting on the app page.",
+        "phase": "setup"
+      },
+      "who": "agent"
     },
     {
       "id": "client-secret",
@@ -102,7 +126,17 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/best-practices-for-creating-an-oauth-app",
         "quote": "Client secrets are required to generate access tokens for your app, unless your app uses the device flow."
-      }
+      },
+      "time": {
+        "kind": "measured",
+        "min_minutes": 1.27,
+        "max_minutes": 1.27,
+        "measured_on": "2026-10-28",
+        "basis": "Timed run: 76 s including GitHub Confirm access by the account owner and moving the secret to a private file.",
+        "phase": "setup"
+      },
+      "who": "agent + you",
+      "handoff": "GitHub asks for Confirm access (password, passkey or GitHub Mobile), which only the account owner can complete."
     },
     {
       "id": "scopes",
@@ -113,7 +147,16 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps",
         "quote": "repo Grants full access to public and private repositories including read and write access to code"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "min_minutes": 15,
+        "max_minutes": 60,
+        "basis": "Mapping the API calls you need to scopes on GitHub's scope list.",
+        "phase": "setup"
+      },
+      "who": "agent + you",
+      "handoff": "You confirm which API calls your product needs."
     },
     {
       "id": "authorize",
@@ -129,7 +172,16 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
         "quote": "If the states don't match, then a third party created the request, and you should abort the process."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "min_minutes": 60,
+        "max_minutes": 180,
+        "basis": "Building the login redirect: state stored per session, PKCE verifier and challenge.",
+        "phase": "build"
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "exchange",
@@ -145,7 +197,16 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
         "quote": "Exchange this code for an access token: POST https://github.com/login/oauth/access_token"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "min_minutes": 120,
+        "max_minutes": 240,
+        "basis": "Callback route, token exchange, and encrypted token storage.",
+        "phase": "build"
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "api-call",
@@ -161,7 +222,16 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
         "quote": "The access token allows you to make requests to the API on a behalf of a user."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "min_minutes": 30,
+        "max_minutes": 90,
+        "basis": "Wiring the token into your API client and handling 401 responses.",
+        "phase": "build"
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "refresh",
@@ -172,7 +242,42 @@
       "source": {
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
         "quote": "The access token expires after eight hours, and the refresh token expires after six months without use."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "min_minutes": 60,
+        "max_minutes": 180,
+        "basis": "Refresh before or after expiry, storing the rotated refresh token, and re-auth on failure.",
+        "phase": "build"
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
+    },
+    {
+      "id": "first-run",
+      "title": "Run one authorization end to end",
+      "actor": "Developer",
+      "evidence": "auth-tested",
+      "detail": "With the pieces above in place, sign in once as a test user and make one read-only API call before building further.",
+      "time": {
+        "kind": "measured",
+        "min_minutes": 0.43,
+        "max_minutes": 0.43,
+        "measured_on": "2026-10-28",
+        "basis": "Timed run: 26 s from opening the authorize URL to a successful GET /user, including the consent click.",
+        "phase": "setup"
+      },
+      "test_record": {
+        "date": "2026-10-28",
+        "result": "Second run on a fresh test app: state valid, S256 PKCE, token exchange HTTP 200, GET /user HTTP 200, no scopes.",
+        "limits": "Loopback callback; automation-driven clicks."
+      },
+      "source": {
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps",
+        "quote": "GitHub redirects back to your site with a temporary code in a code parameter"
+      },
+      "who": "agent + you",
+      "handoff": "A test user must click Authorize on GitHub's consent screen."
     }
   ],
   "gaps": [
@@ -256,7 +361,17 @@
         "ok": true,
         "reason": "quote found on official page",
         "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
+      },
+      {
+        "id": "first-run",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"
       }
     ]
+  },
+  "difficulty": {
+    "level": "easy",
+    "reason": "No provider review before users can connect. The only human-only step is GitHub's Confirm access when you generate the client secret."
   }
 }
