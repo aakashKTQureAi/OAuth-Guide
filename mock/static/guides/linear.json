@@ -11,13 +11,10 @@
   ],
   "summary": "Create an OAuth2 application in Linear, send users to linear.app/oauth/authorize with state and PKCE, exchange the code at api.linear.app, and call the GraphQL API. Generated live by the research agent from Linear's developer docs; nothing here was exercised in a Linear workspace.",
   "effort": {
-    "active": {
-      "estimate": "Not measured",
-      "basis": "No hands-on run, so no effort figure is claimed."
-    },
+    "assumptions": "an experienced developer, an existing web backend reachable over HTTPS with a secret store and a database for tokens, and a standard OAuth client library. Excludes customer admin approvals, security review and production rollout",
     "wait": {
-      "estimate": "Unknown",
-      "basis": "The OAuth page checked describes no review step before users can authorize. Listing in Linear's Integration Directory was not researched."
+      "estimate": "None stated",
+      "basis": "Linear's OAuth page describes no review before users can authorize. Listing in the Integration Directory is optional and not part of OAuth setup."
     }
   },
   "prerequisites": [
@@ -51,7 +48,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "Create a new OAuth2 Application and configure the redirect callback URLs to your application."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 5,
+        "max_minutes": 15,
+        "basis": "Creating the app and adding callback URLs in Settings → API."
+      },
+      "who": "agent + you",
+      "handoff": "Must be done by an admin of the workspace that will own the app."
     },
     {
       "id": "actor",
@@ -62,7 +68,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-actor-authorization",
         "quote": "To enable the actor authorization, add actor=app parameter to your OAuth authorization URL."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 5,
+        "max_minutes": 10,
+        "basis": "Choosing user or app actor."
+      },
+      "who": "agent + you",
+      "handoff": "You decide whose name actions appear under."
     },
     {
       "id": "scopes",
@@ -73,7 +88,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "read - (Default) Read access for the user’s account. This scope will always be present."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 10,
+        "max_minutes": 30,
+        "basis": "Picking targeted scopes from Linear's list."
+      },
+      "who": "agent + you",
+      "handoff": "You confirm what your product needs to read or write."
     },
     {
       "id": "authorize",
@@ -84,7 +108,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "Prevents CSRF attacks and should always be supplied."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 60,
+        "max_minutes": 180,
+        "basis": "Login redirect with state and PKCE."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "callback",
@@ -95,7 +128,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "If the values do not match, the request should not be trusted."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 15,
+        "max_minutes": 45,
+        "basis": "State check on the callback route."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "exchange",
@@ -106,7 +148,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "After receiving the code , you can exchange it for a Linear API access token: POST https://api.linear.app/oauth/token"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 120,
+        "max_minutes": 240,
+        "basis": "Token exchange and encrypted token storage."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "api-call",
@@ -117,7 +168,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "Authorization: Bearer <ACCESS_TOKEN> curl https://api.linear.app/graphql"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 30,
+        "max_minutes": 90,
+        "basis": "GraphQL client wired to the user's token."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "refresh",
@@ -128,7 +188,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "The access token is valid for 24 hours and will need to be refreshed when it expires."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 60,
+        "max_minutes": 180,
+        "basis": "Daily refresh and storing the rotated refresh token."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "revoke",
@@ -139,7 +208,16 @@
       "source": {
         "url": "https://linear.app/developers/oauth-2-0-authentication",
         "quote": "POST https://api.linear.app/oauth/revoke"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 30,
+        "max_minutes": 60,
+        "basis": "Revoking tokens on disconnect."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     }
   ],
   "gaps": [
@@ -225,5 +303,9 @@
         "url": "https://linear.app/developers/oauth-2-0-authentication"
       }
     ]
+  },
+  "difficulty": {
+    "level": "easy",
+    "reason": "Standard authorization code flow with PKCE and no review stated before users can connect. Access tokens last 24 hours, so refresh handling is required from day one."
   }
 }
