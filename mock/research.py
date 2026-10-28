@@ -4,6 +4,8 @@ Every provider returns the same thing: (draft_guide, fetched_urls). The draft is
 """
 import json
 
+import openai
+
 import providers
 
 ASSUMPTIONS = ("an experienced developer, an existing web backend reachable over HTTPS with a secret store and a "
@@ -139,6 +141,50 @@ def research_anthropic(conn, request, review, client=None):
     raise ResearchFailed("The model did not finish the guide within the turn limit.")
 
 
+OPENAI_SYSTEM = SYSTEM.replace("then call submit_guide exactly once", "then return the guide as JSON matching the schema").replace(
+    "Fetch every page you cite.", "Open every page you cite with web search.")
+
+
+def _openai_sources(resp, fetched):
+    for item in resp.output:
+        if item.type == "web_search_call":
+            for src in getattr(item.action, "sources", None) or []:
+                if getattr(src, "url", None):
+                    fetched.add(src.url)
+        elif item.type == "message":
+            for part in item.content:
+                for ann in getattr(part, "annotations", None) or []:
+                    if getattr(ann, "type", "") == "url_citation":
+                        fetched.add(ann.url)
+
+
+def research_openai(conn, request, review, client=None):
+    """OpenAI Responses API with web search; the guide comes back as schema-constrained JSON."""
+    client = client or openai.OpenAI(api_key=conn["api_key"], max_retries=1, timeout=600.0)
+    fetched, prompt, previous = set(), user_prompt(request), None
+    for attempt in range(2):
+        try:
+            resp = client.responses.create(
+                model=conn["model"], instructions=OPENAI_SYSTEM, input=prompt, previous_response_id=previous,
+                tools=[{"type": "web_search"}], include=["web_search_call.action.sources"],
+                text={"format": {"type": "json_schema", "name": "oauth_guide", "schema": GUIDE_SCHEMA, "strict": True}})
+        except Exception as exc:  # provider errors become a safe message; the key is never in it
+            raise ResearchFailed(f"The model call failed ({type(exc).__name__}).") from None
+        _openai_sources(resp, fetched)
+        try:
+            guide = to_guide(json.loads(resp.output_text), request, conn)
+        except (ValueError, KeyError, TypeError):
+            raise ResearchFailed("The model did not return a usable guide.") from None
+        problems = review(guide) if attempt == 0 else []
+        if not problems:
+            return guide, sorted(fetched)
+        previous, prompt = resp.id, "Fix these problems and return the full corrected guide:\n- " + "\n- ".join(problems)
+    raise AssertionError("unreachable")
+
+
+RESEARCHERS = {"anthropic": research_anthropic, "portkey": research_anthropic, "openai": research_openai}
+
+
 def self_check():
     from types import SimpleNamespace as NS
     draft = {"name": "Acme", "aliases": ["acme"], "domains": ["Docs.Acme.com"], "summary": "s",
@@ -180,7 +226,36 @@ def self_check():
         raise AssertionError("refusal must fail")
     except ResearchFailed:
         pass
+    check_openai()
     print("SELF_CHECK_PASSED")
+
+
+def check_openai():
+    from types import SimpleNamespace as NS
+    draft = {"name": "Acme", "aliases": [], "domains": ["docs.acme.com"], "summary": "s",
+             "difficulty": {"level": "easy", "reason": "r"},
+             "wait": {"estimate": "None stated", "basis": "b", "source": {"url": "", "quote": ""}},
+             "prerequisites": [], "gaps": [], "steps": []}
+    out = [NS(type="web_search_call", action=NS(sources=[NS(url="https://docs.acme.com/a")])),
+           NS(type="message", content=[NS(annotations=[NS(type="url_citation", url="https://docs.acme.com/b")])])]
+    calls = []
+    def create(**kw):
+        calls.append(kw)
+        return NS(id=f"r{len(calls)}", output=out, output_text=json.dumps(draft))
+    client = NS(responses=NS(create=create))
+    reviews = []
+    guide, fetched = research_openai({"provider": "openai", "model": "m"}, {"slug": "acme", "query": "Acme"},
+                                     lambda g: reviews.append(g) or (["bad quote"] if len(reviews) == 1 else []), client)
+    assert len(calls) == 2 and calls[1]["previous_response_id"] == "r1" and "bad quote" in calls[1]["input"]
+    assert calls[0]["text"]["format"]["strict"] is True and calls[0]["tools"] == [{"type": "web_search"}]
+    assert fetched == ["https://docs.acme.com/a", "https://docs.acme.com/b"] and guide["generated_by"]["provider"] == "openai"
+    assert "submit_guide" not in OPENAI_SYSTEM
+    bad = lambda **kw: NS(id="x", output=[], output_text="not json")
+    try:
+        research_openai({"provider": "openai", "model": "m"}, {"slug": "a", "query": "a"}, lambda g: [], NS(responses=NS(create=bad)))
+        raise AssertionError("invalid JSON must fail")
+    except ResearchFailed:
+        pass
 
 
 if __name__ == "__main__":
