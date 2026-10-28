@@ -12,15 +12,16 @@
     "docs.slack.dev",
     "api.slack.com"
   ],
-  "summary": "Create a Slack app, add an HTTPS redirect URL and scopes, send users to slack.com/oauth/v2/authorize, and exchange the code with oauth.v2.access. Installing outside your own workspace needs public distribution; commercial apps go through Slack Marketplace review. Generated live by the research agent from Slack's developer docs; nothing here was exercised in a Slack workspace.",
+  "summary": "Create a Slack app, add an HTTPS redirect URL and scopes, send users to slack.com/oauth/v2/authorize, and exchange the code with oauth.v2.access. Installing outside your own workspace needs public distribution, which is a dashboard button. Generated live by the research agent from Slack's developer docs; nothing here was exercised in a Slack workspace.",
   "effort": {
-    "active": {
-      "estimate": "Not measured",
-      "basis": "No hands-on run, so no effort figure is claimed."
-    },
+    "assumptions": "an experienced developer, an existing web backend reachable over HTTPS with a secret store and a database for tokens, and a standard OAuth client library. Excludes customer admin approvals, security review and production rollout",
     "wait": {
-      "estimate": "Unknown",
-      "basis": "Unlisted distribution is a dashboard button. Slack Marketplace listing involves a review, but the pages checked state no review duration."
+      "estimate": "None for unlisted distribution",
+      "basis": "Activating public distribution is a dashboard button with no review described. A Slack Marketplace listing is optional and not part of OAuth setup.",
+      "source": {
+        "url": "https://docs.slack.dev/app-management/distribution/",
+        "quote": "Click Activate Public Distribution."
+      }
     }
   },
   "prerequisites": [
@@ -49,7 +50,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "Include both your app's client ID, which is found in the App Management page, and a comma-separated list of scopes"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 5,
+        "max_minutes": 15,
+        "basis": "Creating the app and copying credentials."
+      },
+      "who": "agent + you",
+      "handoff": "Must be done by a signed-in member of the workspace that will own the app."
     },
     {
       "id": "redirect",
@@ -67,7 +77,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "The redirect_uri must use HTTPS."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 10,
+        "max_minutes": 60,
+        "basis": "Adding the redirect URL; local testing also needs an HTTPS certificate or tunnel."
+      },
+      "who": "agent + you",
+      "handoff": "You approve any certificate or tunnel service used on your machine."
     },
     {
       "id": "scopes",
@@ -78,7 +97,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "Bot scopes should be added as scope=<bot_scope> , and user scopes should be added as user_scope=<user_scope> ."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 10,
+        "max_minutes": 30,
+        "basis": "Choosing minimal bot and user scopes."
+      },
+      "who": "agent + you",
+      "handoff": "You confirm what your product needs."
     },
     {
       "id": "additive",
@@ -89,7 +117,15 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "There is no way to remove scopes from an existing token without revoking it entirely."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 5,
+        "max_minutes": 10,
+        "basis": "Planning scope changes before release."
+      },
+      "who": "agent"
     },
     {
       "id": "authorize",
@@ -100,7 +136,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "To request scopes, redirect Slack users to https://slack.com/oauth/v2/authorize ."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 60,
+        "max_minutes": 180,
+        "basis": "Install link with scopes, redirect_uri and state."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "state",
@@ -111,7 +156,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "Check the state parameter if you sent one along with your initial user redirect."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 15,
+        "max_minutes": 45,
+        "basis": "State check on the redirect route."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "exchange",
@@ -122,7 +176,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "sends it to the oauth.v2.access API endpoint to exchange that code for an access token."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 120,
+        "max_minutes": 240,
+        "basis": "oauth.v2.access call and encrypted token storage."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "confirm-team",
@@ -133,7 +196,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "The oauth.v2.access response is the source of truth"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 30,
+        "max_minutes": 90,
+        "basis": "Storing team or enterprise ids from the response."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "api-call",
@@ -144,7 +216,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "The best way to communicate your access tokens — also known as bearer tokens — to Slack is by presenting them in a request's Authorization HTTP header"
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 30,
+        "max_minutes": 90,
+        "basis": "Web API client using the bot token."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "lifetime",
@@ -155,7 +236,16 @@
       "source": {
         "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
         "quote": "OAuth tokens do not expire."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "build",
+        "min_minutes": 30,
+        "max_minutes": 90,
+        "basis": "Revocation, and token rotation if you opt in."
+      },
+      "who": "agent + you",
+      "handoff": "You review, deploy, and keep the client secret in your secret store; a coding agent can write this part."
     },
     {
       "id": "distribution",
@@ -166,18 +256,16 @@
       "source": {
         "url": "https://docs.slack.dev/app-management/distribution/",
         "quote": "Click Activate Public Distribution."
-      }
-    },
-    {
-      "id": "marketplace",
-      "title": "For commercial launch, submit to the Slack Marketplace",
-      "actor": "Developer + Slack review",
-      "evidence": "documented",
-      "detail": "Marketplace listing is a separate approval from distribution. Review time is not stated on the pages checked.",
-      "source": {
-        "url": "https://docs.slack.dev/app-management/distribution/",
-        "quote": "Unlike unlisted distributed apps, apps listed in the Slack Marketplace are reviewed against our requirements & guidelines to ensure a quality experience for end users."
-      }
+      },
+      "time": {
+        "kind": "estimate",
+        "phase": "setup",
+        "min_minutes": 2,
+        "max_minutes": 5,
+        "basis": "One button in the app dashboard."
+      },
+      "who": "agent + you",
+      "handoff": "Done by the app owner in the dashboard."
     }
   ],
   "gaps": [
@@ -185,11 +273,6 @@
       "text": "Nothing was exercised in a Slack workspace; every step is documentation-backed only.",
       "critical": false,
       "next_action": "Create a test app in a sandbox workspace and run one install with a minimal bot scope."
-    },
-    {
-      "text": "Slack Marketplace review requirements and timeline were not researched.",
-      "critical": false,
-      "next_action": "Read the Slack Marketplace guide before planning a commercial launch date."
     },
     {
       "text": "Slack's PKCE guide (listed in its docs navigation) was not read, so PKCE support details are not included.",
@@ -281,11 +364,15 @@
         "url": "https://docs.slack.dev/app-management/distribution/"
       },
       {
-        "id": "marketplace",
+        "id": "provider-wait",
         "ok": true,
         "reason": "quote found on official page",
         "url": "https://docs.slack.dev/app-management/distribution/"
       }
     ]
+  },
+  "difficulty": {
+    "level": "moderate",
+    "reason": "Redirect URLs must be HTTPS, even for local testing; scopes only accumulate across installs; and you must activate distribution before other workspaces can install."
   }
 }
