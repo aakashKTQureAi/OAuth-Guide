@@ -95,3 +95,6 @@ ol.progress li.done { color: var(--ok); }
 ol.progress li.done::after { content: " ✓"; }
 ol.progress li.active { color: var(--text); font-weight: 600; }
 p.time { font-size: 14px; color: var(--muted); margin: 6px 0; }
+p.handoff { font-size: 14px; color: var(--warn); margin: 4px 0; }
+p.difficulty { margin: 12px 0 0; }
+.card ul.plain { margin: 6px 0 0; font-size: 15px; }

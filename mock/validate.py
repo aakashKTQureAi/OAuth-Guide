@@ -63,8 +63,16 @@ def claims(guide):
 
 
 def time_errors(guide):
-    """Malformed time data is an authoring error, not evidence: it never changes status."""
+    """Malformed time, difficulty or handoff data is an authoring error, not evidence: it never changes status."""
     errors = []
+    d = guide.get("difficulty")
+    if d is not None and (d.get("level") not in ("easy", "moderate", "hard") or not d.get("reason", "").strip()):
+        errors.append("difficulty needs level easy/moderate/hard and a reason")
+    for step in guide.get("steps", []):
+        if step.get("who") not in (None, "agent", "you", "agent + you"):
+            errors.append(f"{step['id']}: who must be agent, you, or agent + you")
+        elif step.get("who") in ("you", "agent + you") and not step.get("handoff", "").strip():
+            errors.append(f"{step['id']}: steps that need you must say why in handoff")
     for step in guide.get("steps", []):
         t = step.get("time")
         if t is None:
@@ -149,6 +157,13 @@ def self_check():
     assert time_errors(guide) == ["a: time needs 0 <= min_minutes <= max_minutes"]
     guide["steps"][0]["time"]["min_minutes"] = 30
     assert not time_errors(guide) and verify(guide, get)["status"] == "complete", "valid times never change status"
+    guide["difficulty"] = {"level": "trivial", "reason": "x"}
+    assert time_errors(guide) == ["difficulty needs level easy/moderate/hard and a reason"]
+    guide["difficulty"]["level"] = "easy"
+    guide["steps"][0]["who"] = "you"
+    assert time_errors(guide) == ["a: steps that need you must say why in handoff"]
+    guide["steps"][0]["handoff"] = "2FA"
+    assert not time_errors(guide)
     guide["effort"]["wait"] = {"estimate": "Days", "source": {"url": "https://docs.example.com/good", "quote": "Click Delete"}}
     assert verify(guide, get)["status"] == "incomplete", "a sourced wait is checked like any claim"
     print("SELF_CHECK_PASSED")

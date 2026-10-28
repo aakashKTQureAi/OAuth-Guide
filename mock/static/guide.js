@@ -74,6 +74,16 @@ function effortCard(label, item) {
     item?.source ? sourceLink(item.source) : null);
 }
 
+function handoffSection(g) {
+  const agent = g.steps.filter(s => s.who === "agent" || s.who === "agent + you");
+  const you = g.steps.filter(s => s.who === "you" || s.who === "agent + you");
+  if (!agent.length && !you.length) return null;
+  const list = (steps, why) => el("ul", { class: "plain" }, steps.map(s => el("li", {}, s.title, why && s.handoff ? el("span", { class: "hint" }, ` — ${s.handoff}`) : null)));
+  return el("section", { class: "cards" },
+    el("div", { class: "card" }, el("div", { class: "label" }, "What an agent can do for you"), list(agent, false)),
+    el("div", { class: "card" }, el("div", { class: "label" }, "Where you take over"), list(you, true)));
+}
+
 function render(g) {
   const v = g.verification;
   const results = Object.fromEntries((v?.results || []).map(r => [r.id, r]));
@@ -92,7 +102,9 @@ function render(g) {
       el("div", { class: "step-head" },
         el("h3", {}, `${i + 1}. ${s.title}`),
         el("span", { class: `badge ${tone}`, title: why }, label),
-        s.actor ? el("span", { class: "badge neutral" }, s.actor) : null),
+        s.actor ? el("span", { class: "badge neutral" }, s.actor) : null,
+        s.who ? el("span", { class: `badge ${s.who === "agent" ? "info" : "warn"}` }, s.who === "agent" ? "Agent can do" : s.who === "you" ? "You take over" : "Agent + you") : null),
+      s.handoff ? el("p", { class: "handoff" }, "You take over: " + s.handoff) : null,
       el("p", {}, s.detail), timeNote(s.time), settings, test, checkNote(results[s.id]), sourceLink(s.source));
   });
 
@@ -105,13 +117,17 @@ function render(g) {
 
   const sources = [...new Set([...(g.prerequisites || []), ...g.steps].map(x => x.source?.url).filter(Boolean))];
 
-  document.getElementById("guide").replaceChildren(
+  document.getElementById("guide").replaceChildren(...[
     el("p", { class: "eyebrow" }, "OAuth setup roadmap"),
     el("h1", {}, g.name),
     el("div", { class: "status-row" },
       el("span", { class: `badge ${status === "complete" ? "ok" : "gap"}` }, status === "complete" ? "All steps source-checked" : status === "incomplete" ? "Incomplete" : "Not checked"),
       el("span", { class: "hint" }, v ? `Checked ${v.checked_at} · ${v.method}` : "No evidence check recorded.")),
+    g.difficulty ? el("p", { class: "difficulty" },
+      el("span", { class: `badge ${{ easy: "ok", moderate: "warn", hard: "gap" }[g.difficulty.level]}` }, `Difficulty: ${g.difficulty.level}`),
+      " ", g.difficulty.reason) : null,
     el("p", { class: "lede" }, g.summary),
+    handoffSection(g),
     el("section", { class: "cards" }, timeCards(g),
       el("div", {}, effortCard("Approval wait before other users can connect", g.effort?.wait), g.effort?.wait?.source ? checkNote(results["provider-wait"]) : null)),
     g.effort?.assumptions ? el("p", { class: "hint" }, `Times assume ${g.effort.assumptions}.`) : null,
@@ -120,7 +136,7 @@ function render(g) {
     el("section", {}, el("h2", {}, "Gaps and open questions"),
       gaps.length ? el("ul", { class: "plain" }, gaps) : el("p", { class: "hint" }, "None recorded.")),
     el("section", {}, el("h2", {}, "Sources"),
-      el("ul", {}, sources.map(u => el("li", {}, el("a", { href: u, target: "_blank", rel: "noopener" }, u))))));
+      el("ul", {}, sources.map(u => el("li", {}, el("a", { href: u, target: "_blank", rel: "noopener" }, u)))))].filter(Boolean));
 }
 
 const slug = new URLSearchParams(location.search).get("slug") || "";
