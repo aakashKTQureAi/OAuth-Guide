@@ -1,0 +1,229 @@
+{
+  "slug": "linear",
+  "name": "Linear (OAuth 2.0)",
+  "aliases": [
+    "linear",
+    "linear.app",
+    "linear oauth"
+  ],
+  "domains": [
+    "linear.app"
+  ],
+  "summary": "Create an OAuth2 application in Linear, send users to linear.app/oauth/authorize with state and PKCE, exchange the code at api.linear.app, and call the GraphQL API. Generated live by the research agent from Linear's developer docs; nothing here was exercised in a Linear workspace.",
+  "effort": {
+    "active": {
+      "estimate": "Not measured",
+      "basis": "No hands-on run, so no effort figure is claimed."
+    },
+    "wait": {
+      "estimate": "Unknown",
+      "basis": "The OAuth page checked describes no review step before users can authorize. Listing in Linear's Integration Directory was not researched."
+    }
+  },
+  "prerequisites": [
+    {
+      "text": "A Linear workspace to own the app. Linear suggests a dedicated workspace, because every admin there can manage the app.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "It is highly recommended you create a workspace for the purpose of managing the OAuth2 Application, as each admin user will have access."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "create",
+      "title": "Create the OAuth2 application and its callback URLs",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "In Linear, open Settings → API and create an OAuth2 application. Add your agent application's backend callback (e.g. https://your-agent.example/auth/linear/callback, illustrative). Leave client credentials tokens off unless you need server-to-server tokens.",
+      "settings": [
+        {
+          "field": "Callback URLs",
+          "value": "https://your-agent.example/auth/linear/callback",
+          "explain": "Illustrative production value. The redirect_uri you send later must be one of these. Localhost support was not established."
+        },
+        {
+          "field": "Client credentials tokens",
+          "value": "Off",
+          "explain": "Only for server-to-server automation without a user; those tokens act as the app across public teams."
+        }
+      ],
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "Create a new OAuth2 Application and configure the redirect callback URLs to your application."
+      }
+    },
+    {
+      "id": "actor",
+      "title": "Decide who actions appear to come from",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "Default actor=user makes changes as the authorizing person. For an agent, actor=app makes changes appear as your app instead.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-actor-authorization",
+        "quote": "To enable the actor authorization, add actor=app parameter to your OAuth authorization URL."
+      }
+    },
+    {
+      "id": "scopes",
+      "title": "Request the narrowest scopes",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "read is always included. Prefer targeted scopes such as issues:create or comments:create over write, and avoid admin unless it is truly needed.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "read - (Default) Read access for the user’s account. This scope will always be present."
+      }
+    },
+    {
+      "id": "authorize",
+      "title": "Send the user to Linear with state and PKCE",
+      "actor": "Your app",
+      "evidence": "documented",
+      "detail": "GET https://linear.app/oauth/authorize with client_id, redirect_uri, response_type=code, scope, state, and code_challenge with code_challenge_method=S256.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "Prevents CSRF attacks and should always be supplied."
+      }
+    },
+    {
+      "id": "callback",
+      "title": "Check state on the callback",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "Linear returns code and your state. Reject the callback if state differs from what you stored for this user.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "If the values do not match, the request should not be trusted."
+      }
+    },
+    {
+      "id": "exchange",
+      "title": "Exchange the code for tokens",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "POST a form-encoded body with code, redirect_uri, client_id, client_secret, grant_type=authorization_code (and code_verifier if you used PKCE). Keep the client secret server-side.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "After receiving the code , you can exchange it for a Linear API access token: POST https://api.linear.app/oauth/token"
+      }
+    },
+    {
+      "id": "api-call",
+      "title": "Call the GraphQL API with the token",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "Send Authorization: Bearer <access token> to https://api.linear.app/graphql, or pass the token to the Linear SDK client.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "Authorization: Bearer <ACCESS_TOKEN> curl https://api.linear.app/graphql"
+      }
+    },
+    {
+      "id": "refresh",
+      "title": "Refresh tokens every day",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "Access tokens last 24 hours. Exchange the refresh token at the same token endpoint with grant_type=refresh_token and store the new refresh token each time.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "The access token is valid for 24 hours and will need to be refreshed when it expires."
+      }
+    },
+    {
+      "id": "revoke",
+      "title": "Revoke tokens when a user disconnects",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "POST the token to the revoke endpoint using the token field; 200 means revoked.",
+      "source": {
+        "url": "https://linear.app/developers/oauth-2-0-authentication",
+        "quote": "POST https://api.linear.app/oauth/revoke"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "text": "Nothing was exercised in a Linear workspace; every step is documentation-backed only.",
+      "critical": false,
+      "next_action": "Create a test app in a throwaway workspace and run one read-only authorization."
+    },
+    {
+      "text": "Whether localhost callback URLs are accepted is not stated on the pages checked.",
+      "critical": false,
+      "next_action": "Try a loopback callback during a hands-on test."
+    },
+    {
+      "text": "Listing in Linear's Integration Directory and any review it involves were not researched.",
+      "critical": false,
+      "next_action": "Read Linear's integration directory guidelines before public launch."
+    }
+  ],
+  "verification": {
+    "checked_at": "2026-10-28",
+    "method": "plain HTTPS fetch, tags stripped, normalized text match",
+    "status": "complete",
+    "results": [
+      {
+        "id": "prerequisite-1",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "create",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "actor",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-actor-authorization"
+      },
+      {
+        "id": "scopes",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "authorize",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "callback",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "exchange",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "api-call",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "refresh",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      },
+      {
+        "id": "revoke",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://linear.app/developers/oauth-2-0-authentication"
+      }
+    ]
+  }
+}
