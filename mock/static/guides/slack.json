@@ -1,0 +1,291 @@
+{
+  "slug": "slack",
+  "name": "Slack (OAuth v2 app install)",
+  "aliases": [
+    "slack",
+    "slack.com",
+    "api.slack.com",
+    "docs.slack.dev",
+    "slack app"
+  ],
+  "domains": [
+    "docs.slack.dev",
+    "api.slack.com"
+  ],
+  "summary": "Create a Slack app, add an HTTPS redirect URL and scopes, send users to slack.com/oauth/v2/authorize, and exchange the code with oauth.v2.access. Installing outside your own workspace needs public distribution; commercial apps go through Slack Marketplace review. Generated live by the research agent from Slack's developer docs; nothing here was exercised in a Slack workspace.",
+  "effort": {
+    "active": {
+      "estimate": "Not measured",
+      "basis": "No hands-on run, so no effort figure is claimed."
+    },
+    "wait": {
+      "estimate": "Unknown",
+      "basis": "Unlisted distribution is a dashboard button. Slack Marketplace listing involves a review, but the pages checked state no review duration."
+    }
+  },
+  "prerequisites": [
+    {
+      "text": "A Slack workspace where you build the app. Until you enable distribution, the app installs only there.",
+      "source": {
+        "url": "https://docs.slack.dev/app-management/distribution/",
+        "quote": "By default, a newly built Slack app can only be installed in its associated workspace as mentioned above."
+      }
+    },
+    {
+      "text": "Know your customers' policies: some workspaces only allow Marketplace-listed apps, so an unlisted app may be blocked there.",
+      "source": {
+        "url": "https://docs.slack.dev/app-management/distribution/",
+        "quote": "Other workspaces may only allow the installation of apps officially listed in the Slack Marketplace."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "create",
+      "title": "Create the app and find its client ID and secret",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "Create a Slack app in Slack's App Management pages. The client ID and client secret are listed there; keep the secret in your backend secret store.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "Include both your app's client ID, which is found in the App Management page, and a comma-separated list of scopes"
+      }
+    },
+    {
+      "id": "redirect",
+      "title": "Add an HTTPS redirect URL",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "Under OAuth & Permissions, add your agent application's callback. Plain http (including http://localhost) is not accepted, so local testing needs an HTTPS tunnel or certificate.",
+      "settings": [
+        {
+          "field": "Redirect URL",
+          "value": "https://your-agent.example/auth/slack/callback",
+          "explain": "Illustrative production value. Any redirect_uri you send must match it or be a subdirectory of it, and cannot contain #."
+        }
+      ],
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "The redirect_uri must use HTTPS."
+      }
+    },
+    {
+      "id": "scopes",
+      "title": "Choose bot scopes and, only if needed, user scopes",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "Bot scopes give your app its own identity; user scopes act as the installing user. Start with the minimum list.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "Bot scopes should be added as scope=<bot_scope> , and user scopes should be added as user_scope=<user_scope> ."
+      }
+    },
+    {
+      "id": "additive",
+      "title": "Expect scopes to accumulate across installs",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "Reinstalling with new scopes adds to the token; it never removes earlier ones. Removing a scope means revoking the token.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "There is no way to remove scopes from an existing token without revoking it entirely."
+      }
+    },
+    {
+      "id": "authorize",
+      "title": "Send the user to Slack's authorize URL",
+      "actor": "Your app",
+      "evidence": "documented",
+      "detail": "Link to https://slack.com/oauth/v2/authorize with client_id, scope and/or user_scope, redirect_uri and an unguessable state.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "To request scopes, redirect Slack users to https://slack.com/oauth/v2/authorize ."
+      }
+    },
+    {
+      "id": "state",
+      "title": "Check state when the user returns",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "Slack adds a code (valid for ten minutes) to your redirect URL. Reject the request if state differs from what you stored.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "Check the state parameter if you sent one along with your initial user redirect."
+      }
+    },
+    {
+      "id": "exchange",
+      "title": "Exchange the code with oauth.v2.access",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "Send code, client_id, client_secret and the same redirect_uri you used to authorize. The response holds the bot token (and user token if requested).",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "sends it to the oauth.v2.access API endpoint to exchange that code for an access token."
+      }
+    },
+    {
+      "id": "confirm-team",
+      "title": "Record which workspace or org was installed",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "The user can switch target during consent, so store team.id (or enterprise.id for org-level installs) from the response, not the value you asked for.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "The oauth.v2.access response is the source of truth"
+      }
+    },
+    {
+      "id": "api-call",
+      "title": "Call the Web API with the token",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "Send Authorization: Bearer <token> on each request.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "The best way to communicate your access tokens — also known as bearer tokens — to Slack is by presenting them in a request's Authorization HTTP header"
+      }
+    },
+    {
+      "id": "lifetime",
+      "title": "Plan for token lifetime and revocation",
+      "actor": "Your backend",
+      "evidence": "documented",
+      "detail": "Tokens do not expire unless you opt into token rotation. Revoke unneeded tokens with auth.revoke.",
+      "source": {
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/",
+        "quote": "OAuth tokens do not expire."
+      }
+    },
+    {
+      "id": "distribution",
+      "title": "Activate public distribution to install in other workspaces",
+      "actor": "Developer",
+      "evidence": "documented",
+      "detail": "App dashboard → Manage Distribution → Share Your App with Other Workspaces. This makes the app installable elsewhere without a Marketplace listing.",
+      "source": {
+        "url": "https://docs.slack.dev/app-management/distribution/",
+        "quote": "Click Activate Public Distribution."
+      }
+    },
+    {
+      "id": "marketplace",
+      "title": "For commercial launch, submit to the Slack Marketplace",
+      "actor": "Developer + Slack review",
+      "evidence": "documented",
+      "detail": "Marketplace listing is a separate approval from distribution. Review time is not stated on the pages checked.",
+      "source": {
+        "url": "https://docs.slack.dev/app-management/distribution/",
+        "quote": "Unlike unlisted distributed apps, apps listed in the Slack Marketplace are reviewed against our requirements & guidelines to ensure a quality experience for end users."
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "text": "Nothing was exercised in a Slack workspace; every step is documentation-backed only.",
+      "critical": false,
+      "next_action": "Create a test app in a sandbox workspace and run one install with a minimal bot scope."
+    },
+    {
+      "text": "Slack Marketplace review requirements and timeline were not researched.",
+      "critical": false,
+      "next_action": "Read the Slack Marketplace guide before planning a commercial launch date."
+    },
+    {
+      "text": "Slack's PKCE guide (listed in its docs navigation) was not read, so PKCE support details are not included.",
+      "critical": false,
+      "next_action": "Read docs.slack.dev 'Using PKCE' if your client cannot keep a secret."
+    }
+  ],
+  "verification": {
+    "checked_at": "2026-10-28",
+    "method": "plain HTTPS fetch, tags stripped, normalized text match",
+    "status": "complete",
+    "results": [
+      {
+        "id": "prerequisite-1",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/app-management/distribution/"
+      },
+      {
+        "id": "prerequisite-2",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/app-management/distribution/"
+      },
+      {
+        "id": "create",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "redirect",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "scopes",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "additive",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "authorize",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "state",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "exchange",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "confirm-team",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "api-call",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "lifetime",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/authentication/installing-with-oauth/"
+      },
+      {
+        "id": "distribution",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/app-management/distribution/"
+      },
+      {
+        "id": "marketplace",
+        "ok": true,
+        "reason": "quote found on official page",
+        "url": "https://docs.slack.dev/app-management/distribution/"
+      }
+    ]
+  }
+}
