@@ -187,6 +187,25 @@ def init_data():
     for seed in SEEDS.glob("*.json"):
         if not (GUIDES / seed.name).exists():
             (GUIDES / seed.name).write_text(seed.read_text())
+    rename_generated_guides()
+
+
+def rename_generated_guides():
+    """Move model-generated guides saved under a typed slug to their real name; hand-made seeds are left alone."""
+    for path in sorted(GUIDES.glob("*.json")):
+        if path.name.endswith(".previous.json"):
+            continue
+        try:
+            guide = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        final = canonical_slug(guide.get("name", ""))
+        if not guide.get("generated_by") or not final or final == path.stem or (GUIDES / f"{final}.json").exists():
+            continue
+        guide["slug"] = final
+        guide["aliases"] = sorted(set(guide.get("aliases", [])) | {final, path.stem})
+        write_atomic(GUIDES / f"{final}.json", guide)
+        path.unlink()
 
 
 def load_guides():
@@ -436,6 +455,12 @@ def check_data_dir():
         (GUIDES / seeds[0]).write_text("{}")
         init_data()
         assert (GUIDES / seeds[0]).read_text() == "{}", "seeds never overwrite saved guides"
+        write_atomic(GUIDES / "discorf.json", {"slug": "discorf", "name": "Discord", "aliases": ["discorf"], "generated_by": {"provider": "portkey"}})
+        write_atomic(GUIDES / "jira-typo.json", {"slug": "jira-typo", "name": "Jira Cloud (OAuth 2.0 3LO)", "aliases": []})
+        init_data()
+        moved = json.loads((GUIDES / "discord.json").read_text())
+        assert not (GUIDES / "discorf.json").exists() and moved["slug"] == "discord" and {"discord", "discorf"} <= set(moved["aliases"])
+        assert (GUIDES / "jira-typo.json").exists(), "hand-made guides are not renamed"
     finally:
         DATA, GUIDES, QUEUE = saved
 
