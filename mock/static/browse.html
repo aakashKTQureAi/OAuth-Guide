@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browse guides — OAuth Guide</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">OAuth Guide</a>
+    <a href="/">Find or generate a guide</a>
+  </header>
+  <main>
+    <h1>Existing guides</h1>
+    <p class="lede">Saved guides keep the evidence status and check date they were saved with.</p>
+    <ul class="library" id="library"><li class="hint">Loading…</li></ul>
+  </main>
+  <script>
+    const list = document.getElementById("library");
+    fetch("/api/guides", { cache: "no-store" }).then(r => r.json()).then(guides => {
+      list.replaceChildren(...guides.map(g => {
+        const li = document.createElement("li");
+        li.className = "card";
+        const a = Object.assign(document.createElement("a"), { href: `/guide.html?slug=${encodeURIComponent(g.slug)}`, textContent: g.name });
+        const badge = Object.assign(document.createElement("span"), {
+          className: `badge ${g.status === "complete" ? "ok" : "gap"}`,
+          textContent: g.status === "complete" ? "All steps source-checked" : g.status === "incomplete" ? "Incomplete" : "Not checked" });
+        const meta = Object.assign(document.createElement("p"), { className: "hint", textContent: g.checked_at ? `Checked ${g.checked_at}` : "Never checked" });
+        const head = document.createElement("div");
+        head.className = "step-head";
+        head.append(Object.assign(document.createElement("h3"), {}), badge);
+        head.firstChild.append(a);
+        li.append(head, Object.assign(document.createElement("p"), { textContent: g.summary }), meta);
+        return li;
+      }));
+      if (!guides.length) list.replaceChildren(Object.assign(document.createElement("li"), { className: "hint", textContent: "No guides saved yet." }));
+    });
+  </script>
+</body>
+</html>

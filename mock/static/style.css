@@ -87,3 +87,5 @@ code { font-size: 13px; overflow-wrap: anywhere; }
 details.source { font-size: 14px; margin-top: 6px; }
 details.source blockquote { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--border); color: var(--muted); }
 section ul li a { overflow-wrap: anywhere; }
+ul.library { list-style: none; padding: 0; display: grid; gap: 12px; }
+ul.library p { margin: 6px 0 0; }
