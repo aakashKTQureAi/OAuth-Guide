@@ -81,8 +81,8 @@ def write_atomic(path, data):
     tmp.replace(path)  # readers never see a half-written file
 
 
-def review_problems(guide, fetch):
-    v = validate.verify(guide, fetch)
+def review_problems(guide, fetch, progress=None):
+    v = validate.verify(guide, fetch, progress)
     return [f"{r['id']}: {r['reason']} ({r['url']})" for r in v["results"] if not r["ok"]] + validate.time_errors(guide)
 
 
@@ -93,15 +93,22 @@ def run_job(request, conn):
         label = {"anthropic": "Claude", "openai": "OpenAI", "portkey": "Portkey"}[conn["provider"]]
         update_request(slug, state="researching", note=f"{label} ({conn['model']}) is searching official documentation.")
         fetch = validate.cached_fetcher()
+        say = progress_for(slug)
         def review(g, fetched):
             validate.anchor_domains(g, fetched, request.get("docs_url"))
-            return review_problems(g, fetch)
-        guide, fetched = research.RESEARCHERS[conn["provider"]](conn, request, review, progress=progress_for(slug))
+            say(f"Draft ready with {len(g.get('steps', []))} steps; checking it before saving")
+            problems = review_problems(g, fetch, say)
+            if problems:
+                say(f"The check flagged {len(problems)} problem{'s' * (len(problems) != 1)}; asking the model to fix them")
+            return problems
+        guide, fetched = research.RESEARCHERS[conn["provider"]](conn, request, review, progress=say)
         validate.anchor_domains(guide, fetched, request.get("docs_url"))
         update_request(slug, state="validating", note="Re-fetching every cited page to confirm each quote.")
-        review_problems(guide, fetch)  # records verification; failed quotes save as Incomplete, not as errors
+        review_problems(guide, fetch, say)  # records verification; failed quotes save as Incomplete, not as errors
         if validate.time_errors(guide):
             raise research.ResearchFailed("The guide was malformed after one repair round.")
+        v = guide["verification"]
+        say(f"{sum(r['ok'] for r in v['results'])} of {len(v['results'])} quotes confirmed; saved. Opening the guide…")
         write_atomic(GUIDES / f"{slug}.json", guide)
         (QUEUE / f"{slug}.json").unlink(missing_ok=True)
     except research.ResearchFailed as exc:

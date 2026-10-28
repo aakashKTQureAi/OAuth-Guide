@@ -108,9 +108,13 @@ def time_errors(guide):
     return errors
 
 
-def verify(guide, get_page):
+def verify(guide, get_page, progress=None):
     results = []
-    for claim_id, item in claims(guide):
+    todo = list(claims(guide))
+    for i, (claim_id, item) in enumerate(todo, 1):
+        if progress:
+            host = urllib.parse.urlsplit(item.get("source", {}).get("url", "")).hostname or "an unknown site"
+            progress(f"Checking quote {i} of {len(todo)} on {host}")
         ok, reason = check_claim(item.get("source", {}), guide["domains"], get_page)
         if ok and item.get("evidence") == "auth-tested" and not item.get("test_record"):
             ok, reason = False, "auth-tested without a test record"
@@ -180,6 +184,10 @@ def self_check():
     assert not time_errors(guide)
     guide["effort"]["wait"] = {"estimate": "Days", "source": {"url": "https://docs.example.com/good", "quote": "Click Delete"}}
     assert verify(guide, get)["status"] == "incomplete", "a sourced wait is checked like any claim"
+    lines = []
+    verify(guide, get, lines.append)
+    n = len(list(claims(guide)))
+    assert lines[0] == f"Checking quote 1 of {n} on docs.example.com" and len(lines) == n
     g = {"domains": ["docs.acme.com", "acme.com", "evil.example"], "gaps": []}
     assert anchor_domains(g, ["https://docs.acme.com/oauth"]) == ["evil.example"]
     assert g["domains"] == ["docs.acme.com", "acme.com"] and "evil.example" in g["gaps"][0]["text"]
