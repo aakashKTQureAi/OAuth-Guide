@@ -96,7 +96,7 @@ def run_job(request, conn):
         def review(g, fetched):
             validate.anchor_domains(g, fetched, request.get("docs_url"))
             return review_problems(g, fetch)
-        guide, fetched = research.RESEARCHERS[conn["provider"]](conn, request, review)
+        guide, fetched = research.RESEARCHERS[conn["provider"]](conn, request, review, progress=progress_for(slug))
         validate.anchor_domains(guide, fetched, request.get("docs_url"))
         update_request(slug, state="validating", note="Re-fetching every cited page to confirm each quote.")
         review_problems(guide, fetch)  # records verification; failed quotes save as Incomplete, not as errors
@@ -363,7 +363,7 @@ def check_pipeline():
                         "time": {"kind": "estimate", "phase": "setup", "min_minutes": 1, "max_minutes": 2, "basis": "b"},
                         "source": {"url": "https://docs.acme.com/o", "quote": "Click Register application."}}]}
     seen = []
-    def fake(conn, request, review):
+    def fake(conn, request, review, progress):
         seen.append(review(json.loads(json.dumps(guide)), ["https://docs.acme.com/o"]))
         return json.loads(json.dumps(guide)), ["https://docs.acme.com/o"]
     try:
@@ -375,7 +375,7 @@ def check_pipeline():
         stored = (GUIDES / "acme.json").read_text()
         assert seen == [[]] and json.loads(stored)["verification"]["status"] == "complete"
         assert not (QUEUE / "acme.json").exists() and key not in stored
-        def boom(conn, request, review):
+        def boom(conn, request, review, progress):
             raise research.ResearchFailed("The model declined this request.")
         research.RESEARCHERS["anthropic"] = boom
         write_atomic(QUEUE / "beta.json", {"slug": "beta", "state": "queued"})

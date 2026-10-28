@@ -97,6 +97,29 @@ def to_guide(draft, request, conn):
     return guide
 
 
+def _short_url(url):
+    return url.split("://", 1)[-1].split("#")[0][:120]
+
+
+def describe_event(event):
+    """One human-readable activity line for the stream events worth showing, else None."""
+    block = getattr(event, "content_block", None)
+    if event.type == "content_block_start" and getattr(block, "type", "") == "tool_use" and block.name == "submit_guide":
+        return "Writing the guide"
+    if event.type != "content_block_stop" or block is None:
+        return None
+    if block.type == "server_tool_use":
+        args = block.input if isinstance(block.input, dict) else {}
+        if block.name == "web_search" and args.get("query"):
+            return f'Searching: "{args["query"][:120]}"'
+        if block.name == "web_fetch" and args.get("url"):
+            return f"Reading {_short_url(args['url'])}"
+    if block.type == "thinking":
+        summary = (getattr(block, "thinking", "") or "").strip().split("\n")[0]
+        return f"Thinking: {summary[:160]}" if summary else "Thinking"
+    return None
+
+
 def _collect_fetched(blocks, fetched):
     for b in blocks:
         if getattr(b, "type", "") == "web_fetch_tool_result":
@@ -105,7 +128,7 @@ def _collect_fetched(blocks, fetched):
                 fetched.add(url)
 
 
-def research_anthropic(conn, request, review, client=None):
+def research_anthropic(conn, request, review, client=None, progress=lambda text: None):
     """Claude with web search + web fetch; review(guide, fetched_urls) returns a list of problems to send back once."""
     client = client or providers.anthropic_client(conn)
     tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 6},
@@ -113,11 +136,16 @@ def research_anthropic(conn, request, review, client=None):
     messages = [{"role": "user", "content": user_prompt(request)}]
     fetched, reviewed = set(), False
     extra = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"} if conn["provider"] == "anthropic" else {}
-    create = client.beta.messages.create if extra else client.messages.create
+    stream = client.beta.messages.stream if extra else client.messages.stream
     for _ in range(MAX_TURNS):
         try:
-            resp = create(model=conn["model"], max_tokens=16000, system=SYSTEM, tools=tools,
-                          messages=messages, timeout=600, **extra)
+            with stream(model=conn["model"], max_tokens=16000, system=SYSTEM, tools=tools, messages=messages,
+                        thinking={"type": "adaptive", "display": "summarized"}, timeout=600, **extra) as events:
+                for event in events:
+                    line = describe_event(event)
+                    if line:
+                        progress(line)
+                resp = events.get_final_message()
         except Exception as exc:  # provider errors become a safe message; the key is never in it
             raise ResearchFailed(f"The model call failed ({type(exc).__name__}).") from None
         _collect_fetched(resp.content, fetched)
@@ -158,7 +186,7 @@ def _openai_sources(resp, fetched):
                         fetched.add(ann.url)
 
 
-def research_openai(conn, request, review, client=None):
+def research_openai(conn, request, review, client=None, progress=lambda text: None):
     """OpenAI Responses API with web search; the guide comes back as schema-constrained JSON."""
     client = client or openai.OpenAI(api_key=conn["api_key"], max_retries=1, timeout=600.0)
     fetched, prompt, previous = set(), user_prompt(request), None
@@ -200,17 +228,28 @@ def self_check():
         NS(stop_reason="tool_use", content=[NS(type="tool_use", name="submit_guide", id="t1", input=draft)]),
         NS(stop_reason="tool_use", content=[NS(type="tool_use", name="submit_guide", id="t2", input=draft)]),
     ]
-    calls = []
-    def create(**kw):
+    calls, lines = [], []
+    class Stream:
+        def __init__(self, turn, events): self.turn, self.events = turn, events
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def __iter__(self): return iter(self.events)
+        def get_final_message(self): return self.turn
+    def stream(**kw):
         calls.append({**kw, "messages": list(kw["messages"])})  # snapshot: the loop keeps appending
-        return turns[len(calls) - 1]
-    client = NS(messages=NS(create=create), beta=NS(messages=NS(create=create)))
+        events = [NS(type="content_block_stop", content_block=NS(type="server_tool_use", name="web_search", input={"query": "acme oauth"})),
+                  NS(type="content_block_stop", content_block=NS(type="thinking", thinking="Checking the console steps.\nMore")),
+                  NS(type="content_block_start", content_block=NS(type="tool_use", name="submit_guide"))] if len(calls) == 1 else []
+        return Stream(turns[len(calls) - 1], events)
+    client = NS(messages=NS(stream=stream), beta=NS(messages=NS(stream=stream)))
     reviews = []
     def review(g, fetched):
         reviews.append(g)
         return ["quote not found"] if len(reviews) == 1 else []
     conn = {"provider": "anthropic", "model": "claude-opus-5-5"}
-    guide, fetched = research_anthropic(conn, {"slug": "acme", "query": "Acme App"}, review, client)
+    guide, fetched = research_anthropic(conn, {"slug": "acme", "query": "Acme App"}, review, client, lines.append)
+    assert lines == ['Searching: "acme oauth"', "Thinking: Checking the console steps.", "Writing the guide"], lines
+    assert calls[0]["thinking"]["display"] == "summarized"
     assert len(calls) == 4 and len(reviews) == 1, "one review round, then accept the resubmission"
     assert calls[0]["fallbacks"] == "default" and "server-side-fallback-2026-07-01" in calls[0]["betas"]
     assert calls[1]["messages"][-1]["role"] == "assistant", "pause_turn resumes without an extra user message"
