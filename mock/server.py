@@ -10,8 +10,10 @@ import providers, research, validate
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
-GUIDES = STATIC / "guides"
-QUEUE = ROOT / "queue"
+SEEDS = ROOT / "seed-guides"
+DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))  # a persistent volume in production
+GUIDES = DATA / "guides"
+QUEUE = DATA / "queue"
 PORT = 8780
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 HOST_PREFIXES = ("www.", "docs.", "developer.", "developers.", "api.", "app.")
@@ -113,6 +115,15 @@ def public_conn(conn):
     return {"connected": bool(conn), "provider": conn and conn["provider"], "model": conn and conn["model"]}
 
 
+def init_data():
+    """Create the data folders and copy in seed guides that are not there yet; never overwrite saved guides."""
+    GUIDES.mkdir(parents=True, exist_ok=True)
+    QUEUE.mkdir(parents=True, exist_ok=True)
+    for seed in SEEDS.glob("*.json"):
+        if not (GUIDES / seed.name).exists():
+            (GUIDES / seed.name).write_text(seed.read_text())
+
+
 def load_guides():
     guides = []
     for path in sorted(GUIDES.glob("*.json")):
@@ -188,6 +199,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "status": g.get("verification", {}).get("status", "unchecked"),
                 "checked_at": g.get("verification", {}).get("checked_at"),
             } for g in load_guides()])
+        if self.path.startswith("/guides/"):
+            name = self.path[len("/guides/"):].split("?")[0]
+            if not name.endswith(".json") or not SLUG.match(name[:-5]) or not (GUIDES / name).exists():
+                return self.send_json(404, {"error": "not found"})
+            data = (GUIDES / name).read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            return self.wfile.write(data)
         if self.path == "/api/connection":
             return self.send_json(200, public_conn(session_get(self.sid())))
         if self.path.startswith("/api/status/"):
@@ -289,7 +310,24 @@ def self_check():
     assert not SLUG.match("../etc") and not SLUG.match("")
     check_connect_endpoint()
     check_pipeline()
+    check_data_dir()
     print("SELF_CHECK_PASSED")
+
+
+def check_data_dir():
+    import tempfile
+    global DATA, GUIDES, QUEUE
+    saved = (DATA, GUIDES, QUEUE)
+    DATA = Path(tempfile.mkdtemp()); GUIDES, QUEUE = DATA / "guides", DATA / "queue"
+    try:
+        init_data()
+        seeds = sorted(p.name for p in SEEDS.glob("*.json"))
+        assert seeds and sorted(p.name for p in GUIDES.glob("*.json")) == seeds
+        (GUIDES / seeds[0]).write_text("{}")
+        init_data()
+        assert (GUIDES / seeds[0]).read_text() == "{}", "seeds never overwrite saved guides"
+    finally:
+        DATA, GUIDES, QUEUE = saved
 
 
 def check_pipeline():
@@ -375,5 +413,8 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--self-check"]:
         self_check()
     else:
-        print(f"OAuth Guide mock on http://127.0.0.1:{PORT}", flush=True)
-        http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+        init_data()
+        host = os.environ.get("HOST", "127.0.0.1")
+        port = int(os.environ.get("PORT", PORT))
+        print(f"OAuth Guide on http://{host}:{port} (data in {DATA})", flush=True)
+        http.server.ThreadingHTTPServer((host, port), Handler).serve_forever()
