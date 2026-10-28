@@ -37,6 +37,20 @@ def official(url, domains):
     return parts.scheme == "https" and any(host == d or host.endswith("." + d) for d in domains)
 
 
+def anchor_domains(guide, fetched_urls, docs_url=None):
+    """Keep only 'official' domains the research actually fetched (or the visitor named); a model can't vouch for unseen sites."""
+    hosts = {(urllib.parse.urlsplit(u).hostname or "").lower() for u in fetched_urls + ([docs_url] if docs_url else [])}
+    kept, dropped = [], []
+    for d in guide.get("domains", []):
+        (kept if any(h == d or h.endswith("." + d) for h in hosts) else dropped).append(d)
+    guide["domains"] = kept
+    for d in dropped:
+        guide.setdefault("gaps", []).append({
+            "text": f"{d} was proposed as an official source but was never fetched during research, so steps citing it are unverified.",
+            "critical": False, "next_action": "Check that page manually."})
+    return dropped
+
+
 def check_claim(source, domains, get_page):
     """Return (ok, reason) for one {url, quote} source."""
     url, quote = source.get("url", ""), source.get("quote", "")
@@ -166,6 +180,11 @@ def self_check():
     assert not time_errors(guide)
     guide["effort"]["wait"] = {"estimate": "Days", "source": {"url": "https://docs.example.com/good", "quote": "Click Delete"}}
     assert verify(guide, get)["status"] == "incomplete", "a sourced wait is checked like any claim"
+    g = {"domains": ["docs.acme.com", "acme.com", "evil.example"], "gaps": []}
+    assert anchor_domains(g, ["https://docs.acme.com/oauth"]) == ["evil.example"]
+    assert g["domains"] == ["docs.acme.com", "acme.com"] and "evil.example" in g["gaps"][0]["text"]
+    g = {"domains": ["dev.acme.io"]}
+    assert anchor_domains(g, [], "https://dev.acme.io/oauth") == [] and g["domains"] == ["dev.acme.io"]
     print("SELF_CHECK_PASSED")
 
 

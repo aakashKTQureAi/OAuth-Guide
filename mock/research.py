@@ -106,7 +106,7 @@ def _collect_fetched(blocks, fetched):
 
 
 def research_anthropic(conn, request, review, client=None):
-    """Claude with web search + web fetch; review(guide) returns a list of problems to send back once."""
+    """Claude with web search + web fetch; review(guide, fetched_urls) returns a list of problems to send back once."""
     client = client or providers.anthropic_client(conn)
     tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 6},
              {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 10}, SUBMIT_TOOL]
@@ -131,7 +131,7 @@ def research_anthropic(conn, request, review, client=None):
             messages.append({"role": "user", "content": "Call submit_guide with the finished guide."})
             continue
         guide = to_guide(json.loads(json.dumps(submit.input)), request, conn)
-        problems = [] if reviewed else review(guide)
+        problems = [] if reviewed else review(guide, sorted(fetched))
         if not problems:
             return guide, sorted(fetched)
         reviewed = True
@@ -175,7 +175,7 @@ def research_openai(conn, request, review, client=None):
             guide = to_guide(json.loads(resp.output_text), request, conn)
         except (ValueError, KeyError, TypeError):
             raise ResearchFailed("The model did not return a usable guide.") from None
-        problems = review(guide) if attempt == 0 else []
+        problems = review(guide, sorted(fetched)) if attempt == 0 else []
         if not problems:
             return guide, sorted(fetched)
         previous, prompt = resp.id, "Fix these problems and return the full corrected guide:\n- " + "\n- ".join(problems)
@@ -206,7 +206,7 @@ def self_check():
         return turns[len(calls) - 1]
     client = NS(messages=NS(create=create), beta=NS(messages=NS(create=create)))
     reviews = []
-    def review(g):
+    def review(g, fetched):
         reviews.append(g)
         return ["quote not found"] if len(reviews) == 1 else []
     conn = {"provider": "anthropic", "model": "claude-opus-5-5"}
@@ -245,14 +245,14 @@ def check_openai():
     client = NS(responses=NS(create=create))
     reviews = []
     guide, fetched = research_openai({"provider": "openai", "model": "m"}, {"slug": "acme", "query": "Acme"},
-                                     lambda g: reviews.append(g) or (["bad quote"] if len(reviews) == 1 else []), client)
+                                     lambda g, f: reviews.append(g) or (["bad quote"] if len(reviews) == 1 else []), client)
     assert len(calls) == 2 and calls[1]["previous_response_id"] == "r1" and "bad quote" in calls[1]["input"]
     assert calls[0]["text"]["format"]["strict"] is True and calls[0]["tools"] == [{"type": "web_search"}]
     assert fetched == ["https://docs.acme.com/a", "https://docs.acme.com/b"] and guide["generated_by"]["provider"] == "openai"
     assert "submit_guide" not in OPENAI_SYSTEM
     bad = lambda **kw: NS(id="x", output=[], output_text="not json")
     try:
-        research_openai({"provider": "openai", "model": "m"}, {"slug": "a", "query": "a"}, lambda g: [], NS(responses=NS(create=bad)))
+        research_openai({"provider": "openai", "model": "m"}, {"slug": "a", "query": "a"}, lambda g, f: [], NS(responses=NS(create=bad)))
         raise AssertionError("invalid JSON must fail")
     except ResearchFailed:
         pass

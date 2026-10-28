@@ -136,6 +136,8 @@ function render(g) {
     el("section", {}, el("h2", {}, "Gaps and open questions"),
       gaps.length ? el("ul", { class: "plain" }, gaps) : el("p", { class: "hint" }, "None recorded.")),
     el("section", {}, el("h2", {}, "Sources"),
+      g.domains?.length ? el("p", { class: "hint" }, `Treated as official: ${g.domains.join(", ")}. Quotes from any other site fail the check.`) : null,
+      g.generated_by ? el("p", { class: "hint" }, `Researched by ${g.generated_by.provider} (${g.generated_by.model}).`) : null,
       el("ul", {}, sources.map(u => el("li", {}, el("a", { href: u, target: "_blank", rel: "noopener" }, u)))))].filter(Boolean));
 }
 

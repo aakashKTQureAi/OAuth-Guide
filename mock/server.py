@@ -77,7 +77,11 @@ def run_job(request, conn):
         label = {"anthropic": "Claude", "openai": "OpenAI", "portkey": "Portkey"}[conn["provider"]]
         update_request(slug, state="researching", note=f"{label} ({conn['model']}) is searching official documentation.")
         fetch = validate.cached_fetcher()
-        guide, _fetched = research.RESEARCHERS[conn["provider"]](conn, request, lambda g: review_problems(g, fetch))
+        def review(g, fetched):
+            validate.anchor_domains(g, fetched, request.get("docs_url"))
+            return review_problems(g, fetch)
+        guide, fetched = research.RESEARCHERS[conn["provider"]](conn, request, review)
+        validate.anchor_domains(guide, fetched, request.get("docs_url"))
         update_request(slug, state="validating", note="Re-fetching every cited page to confirm each quote.")
         review_problems(guide, fetch)  # records verification; failed quotes save as Incomplete, not as errors
         if validate.time_errors(guide):
@@ -305,8 +309,8 @@ def check_pipeline():
                         "source": {"url": "https://docs.acme.com/o", "quote": "Click Register application."}}]}
     seen = []
     def fake(conn, request, review):
-        seen.append(review(json.loads(json.dumps(guide))))
-        return json.loads(json.dumps(guide)), []
+        seen.append(review(json.loads(json.dumps(guide)), ["https://docs.acme.com/o"]))
+        return json.loads(json.dumps(guide)), ["https://docs.acme.com/o"]
     try:
         key = "sk-test-" + secrets.token_hex(6)
         conn = {"provider": "anthropic", "model": "m", "api_key": key}
