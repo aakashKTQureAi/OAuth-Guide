@@ -26,12 +26,21 @@
         const badge = Object.assign(document.createElement("span"), {
           className: `badge ${g.status === "complete" ? "ok" : "gap"}`,
           textContent: g.status === "complete" ? "All steps source-checked" : g.status === "incomplete" ? "Incomplete" : "Not checked" });
+        const mins = m => m < 1 ? `${Math.round(m * 60)} s` : m < 90 ? `${Math.round(m)} min` : `${Math.round(m / 30) / 2} h`;
+        const range = r => r ? (r[0] === r[1] ? mins(r[0]) : `${mins(r[0])}–${mins(r[1])}`) : "not estimated";
+        const facts = Object.assign(document.createElement("p"), { className: "facts" });
+        facts.append(...[
+          g.difficulty && `Difficulty: ${g.difficulty}`,
+          `Setup: ${range(g.setup)}`,
+          `Build: ${range(g.build)}`,
+          g.wait && `Approval wait: ${g.wait.length > 60 ? g.wait.slice(0, 57) + "…" : g.wait}`,
+        ].filter(Boolean).map(t => Object.assign(document.createElement("span"), { textContent: t })));
         const meta = Object.assign(document.createElement("p"), { className: "hint", textContent: g.checked_at ? `Checked ${g.checked_at}` : "Never checked" });
         const head = document.createElement("div");
         head.className = "step-head";
         head.append(Object.assign(document.createElement("h3"), {}), badge);
         head.firstChild.append(a);
-        li.append(head, Object.assign(document.createElement("p"), { textContent: g.summary }), meta);
+        li.append(head, facts, Object.assign(document.createElement("p"), { textContent: g.summary }), meta);
         return li;
       }));
       if (!guides.length) list.replaceChildren(Object.assign(document.createElement("li"), { className: "hint", textContent: "No guides saved yet." }));

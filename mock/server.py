@@ -208,6 +208,12 @@ def rename_generated_guides():
         path.unlink()
 
 
+def phase_range(guide, phase):
+    """[min, max] minutes summed over a phase's steps, the same totals the guide page shows; None if untimed."""
+    times = [s["time"] for s in guide.get("steps", []) if (s.get("time") or {}).get("phase") == phase]
+    return [sum(t["min_minutes"] for t in times), sum(t["max_minutes"] for t in times)] if times else None
+
+
 def load_guides():
     guides = []
     for path in sorted(GUIDES.glob("*.json")):
@@ -284,6 +290,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "slug": g["slug"], "name": g["name"], "summary": g.get("summary", ""),
                 "status": g.get("verification", {}).get("status", "unchecked"),
                 "checked_at": g.get("verification", {}).get("checked_at"),
+                "difficulty": (g.get("difficulty") or {}).get("level"),
+                "setup": phase_range(g, "setup"), "build": phase_range(g, "build"),
+                "wait": (g.get("effort", {}).get("wait") or {}).get("estimate"),
             } for g in load_guides()])
         if self.path.startswith("/guides/"):
             name = self.path[len("/guides/"):].split("?")[0]
@@ -511,6 +520,7 @@ def check_pipeline():
         assert not (GUIDES / "acmee.json").exists()
         assert find_guide("acme cloud", load_guides())["slug"] == "acme-cloud"
         assert canonical_slug("GitHub (OAuth App)") == "github" and canonical_slug("(x)") == ""
+        assert phase_range(renamed, "setup") == [1, 2] and phase_range(renamed, "build") is None
         (GUIDES / "acme-cloud.json").unlink()
         guide["name"] = "Acme"
         research.RESEARCHERS["anthropic"] = fake

@@ -117,3 +117,5 @@ ol.activity li:last-child { color: var(--text); }
 .stale { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: var(--warn-bg); color: var(--text); font-size: 15px; }
 .stale p { margin: 0 0 6px; }
 .stale .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+p.facts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+p.facts span { font-size: 13px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
