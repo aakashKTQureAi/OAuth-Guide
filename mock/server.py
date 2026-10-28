@@ -109,6 +109,7 @@ def run_job(request, conn):
             raise research.ResearchFailed("The guide was malformed after one repair round.")
         v = guide["verification"]
         say(f"{sum(r['ok'] for r in v['results'])} of {len(v['results'])} quotes confirmed; saved. Opening the guide…")
+        guide["generated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
         write_atomic(GUIDES / f"{slug}.json", guide)
         (QUEUE / f"{slug}.json").unlink(missing_ok=True)
     except research.ResearchFailed as exc:
@@ -380,7 +381,7 @@ def check_pipeline():
         write_atomic(QUEUE / "acme.json", {"slug": "acme", "state": "queued"})
         run_job({"slug": "acme", "query": "Acme"}, conn)
         stored = (GUIDES / "acme.json").read_text()
-        assert seen == [[]] and json.loads(stored)["verification"]["status"] == "complete"
+        assert seen == [[]] and json.loads(stored)["verification"]["status"] == "complete" and json.loads(stored)["generated_at"]
         assert not (QUEUE / "acme.json").exists() and key not in stored
         def boom(conn, request, review, progress):
             raise research.ResearchFailed("The model declined this request.")

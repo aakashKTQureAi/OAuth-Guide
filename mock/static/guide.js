@@ -84,6 +84,32 @@ function handoffSection(g) {
     el("div", { class: "card" }, el("div", { class: "label" }, "Where you take over"), list(you, true)));
 }
 
+const DAY_MS = 24 * 3600 * 1000;
+
+function checkedAt(g) {
+  const t = Date.parse(g.generated_at || g.verification?.checked_at || "");
+  return Number.isNaN(t) ? null : t;
+}
+
+function ageText(g) {
+  const t = checkedAt(g);
+  if (t === null) return "Check date unknown";
+  const days = Math.floor((Date.now() - t) / DAY_MS);
+  return days < 1 ? "Checked today" : days === 1 ? "Checked 1 day ago" : `Checked ${days} days ago`;
+}
+
+function isTested(g) {
+  return g.steps.some(s => s.test_record);
+}
+
+function staleBanner(g) {
+  const t = checkedAt(g);
+  if (t !== null && Date.now() - t < DAY_MS) return null;
+  return el("div", { class: "stale", id: "stale" },
+    el("p", {}, `This guide was last checked ${ageText(g).replace("Checked ", "").toLowerCase()}. Provider docs change; you can refresh it.`),
+    isTested(g) ? el("p", { class: "hint" }, "It includes hands-on test results that a docs-only regeneration cannot reproduce.") : null);
+}
+
 function render(g) {
   const v = g.verification;
   const results = Object.fromEntries((v?.results || []).map(r => [r.id, r]));
@@ -122,7 +148,8 @@ function render(g) {
     el("h1", {}, g.name),
     el("div", { class: "status-row" },
       el("span", { class: `badge ${status === "complete" ? "ok" : "gap"}` }, status === "complete" ? "All steps source-checked" : status === "incomplete" ? "Incomplete" : "Not checked"),
-      el("span", { class: "hint" }, v ? `Checked ${v.checked_at} · ${v.method}` : "No evidence check recorded.")),
+      el("span", { class: "hint" }, v ? `${ageText(g)} · ${v.method}` : "No evidence check recorded.")),
+    staleBanner(g),
     g.difficulty ? el("p", { class: "difficulty" },
       el("span", { class: `badge ${{ easy: "ok", moderate: "warn", hard: "gap" }[g.difficulty.level]}` }, `Difficulty: ${g.difficulty.level}`),
       " ", g.difficulty.reason) : null,
