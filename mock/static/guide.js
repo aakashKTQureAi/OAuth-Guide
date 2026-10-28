@@ -87,8 +87,8 @@ function handoffSection(g) {
 const DAY_MS = 24 * 3600 * 1000;
 
 function checkedAt(g) {
-  const t = Date.parse(g.generated_at || g.verification?.checked_at || "");
-  return Number.isNaN(t) ? null : t;
+  const times = [g.generated_at, g.rechecked_at, g.verification?.checked_at].map(Date.parse).filter(t => !Number.isNaN(t));
+  return times.length ? Math.max(...times) : null;
 }
 
 function ageText(g) {
@@ -108,7 +108,9 @@ function staleBanner(g) {
   return el("div", { class: "stale", id: "stale" },
     el("p", {}, `This guide was last checked ${ageText(g).replace("Checked ", "").toLowerCase()}. Provider docs change; you can refresh it.`),
     isTested(g) ? el("p", { class: "hint" }, "It includes hands-on test results that a docs-only regeneration cannot reproduce.") : null,
-    el("div", { class: "actions" }, button("Regenerate this guide", () => regenerate(g))),
+    el("div", { class: "actions" },
+      isTested(g) ? button("Re-check sources only", () => recheck(g)) : null,
+      button("Regenerate this guide", () => regenerate(g))),
     el("p", { class: "hint", id: "stale-msg" }));
 }
 
@@ -116,6 +118,13 @@ function button(label, onClick) {
   const b = el("button", { type: "button" }, label);
   b.addEventListener("click", onClick);
   return b;
+}
+
+async function recheck(g) {
+  const res = await fetch("/api/recheck", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: g.slug }) });
+  const body = await res.json();
+  if (!res.ok) { document.getElementById("stale-msg").textContent = body.error; return; }
+  location.href = `/research.html?slug=${encodeURIComponent(g.slug)}`;
 }
 
 async function regenerate(g) {

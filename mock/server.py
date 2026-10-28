@@ -124,6 +124,28 @@ def run_job(request, conn):
             JOBS.discard(slug)
 
 
+def run_recheck(request):
+    """Re-fetch every cited page and re-check every quote; no model, so hands-on test records survive."""
+    slug = request["slug"]
+    say = progress_for(slug)
+    try:
+        current = GUIDES / f"{slug}.json"
+        guide = json.loads(current.read_text())
+        update_request(slug, state="validating", note="Re-fetching every cited page to confirm each quote.")
+        review_problems(guide, validate.cached_fetcher(), say)
+        guide["rechecked_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+        v = guide["verification"]
+        say(f"{sum(r['ok'] for r in v['results'])} of {len(v['results'])} quotes confirmed; saved. Opening the guide…")
+        write_atomic(GUIDES / f"{slug}.previous.json", json.loads(current.read_text()))
+        write_atomic(current, guide)
+        (QUEUE / f"{slug}.json").unlink(missing_ok=True)
+    except Exception as exc:  # the saved guide is only replaced after a full re-check
+        update_request(slug, state="failed", note=f"Re-check stopped ({type(exc).__name__}).")
+    finally:
+        with JOBS_LOCK:
+            JOBS.discard(slug)
+
+
 def start_job(request, conn):
     with JOBS_LOCK:
         if request["slug"] in JOBS:
@@ -131,7 +153,10 @@ def start_job(request, conn):
         if len(JOBS) >= MAX_JOBS:
             return False
         JOBS.add(request["slug"])
-    threading.Thread(target=run_job, args=(request, dict(conn)), daemon=True).start()
+    if conn is None:
+        threading.Thread(target=run_recheck, args=(request,), daemon=True).start()
+    else:
+        threading.Thread(target=run_job, args=(request, dict(conn)), daemon=True).start()
     return True
 
 
@@ -266,6 +291,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.connect()
         if self.path == "/api/regenerate":
             return self.regenerate()
+        if self.path == "/api/recheck":
+            return self.recheck()
         if self.path == "/api/disconnect":
             session_drop(self.sid())
             return self.send_json(200, public_conn(None))
@@ -306,6 +333,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_json(503, {"error": "The research agent is busy. Try again in a minute."})
         return self.send_json(202, {"found": False, "slug": slug})
 
+
+    def recheck(self):
+        slug = str((self.read_json() or {}).get("slug") or "")
+        if not SLUG.match(slug) or not (GUIDES / f"{slug}.json").exists():
+            return self.send_json(404, {"error": "No saved guide to re-check."})
+        request = {"slug": slug, "query": slug, "state": "queued", "regenerate": True,
+                   "note": "Re-checking every quote against the live pages.",
+                   "requested_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+        write_atomic(QUEUE / f"{slug}.json", request)
+        if not start_job(request, None):
+            return self.send_json(503, {"error": "The checker is busy. Try again in a minute."})
+        return self.send_json(202, {"slug": slug})
 
     def regenerate(self):
         slug = str((self.read_json() or {}).get("slug") or "")
@@ -432,6 +471,13 @@ def check_pipeline():
         run_job({"slug": "acme", "query": "Acme", "regenerate": True}, conn)
         assert (GUIDES / "acme.json").read_text() == before, "a failed regeneration keeps the saved guide"
         assert json.loads((QUEUE / "acme.json").read_text())["state"] == "failed"
+        tested = json.loads(before)
+        tested["steps"][0]["test_record"] = {"date": "2026-10-28", "result": "HTTP 200"}
+        write_atomic(GUIDES / "acme.json", tested)
+        write_atomic(QUEUE / "acme.json", {"slug": "acme", "state": "queued"})
+        run_recheck({"slug": "acme"})
+        rechecked = json.loads((GUIDES / "acme.json").read_text())
+        assert rechecked["steps"][0]["test_record"] and rechecked["rechecked_at"] and not (QUEUE / "acme.json").exists()
         write_atomic(QUEUE / "feed.json", {"slug": "feed", "state": "researching"})
         say = progress_for("feed")
         for i in range(MAX_ACTIVITY + 5):
