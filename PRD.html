@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OAuth Guide — Product Requirements</title>
+<style>
+:root {
+  --bg: #f7f6f2; --surface: #ffffff; --text: #1d1d1b; --muted: #61615b; --border: #e3e1d9;
+  --accent: #3155c9; --ok-bg: #e4f3e8; --ok: #1d6b3a; --warn-bg: #fcf0d9; --warn: #855700;
+  --gap-bg: #fbe6e6; --gap: #9b2c2c; --info-bg: #e6edfc; --info: #23479c; --code: #f0eee7;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #151514; --surface: #1f1f1d; --text: #ecebe7; --muted: #a3a29b; --border: #34332f;
+    --accent: #87a3f6; --ok-bg: #16311f; --ok: #8fd6a8; --warn-bg: #36290e; --warn: #f0c46b;
+    --gap-bg: #3b1b1b; --gap: #f2a3a3; --info-bg: #1b2948; --info: #a9c1f7; --code: #2a2a27; }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); }
+.layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 40px; max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+nav { position: sticky; top: 24px; align-self: start; font-size: 14px; }
+nav p { font-weight: 600; margin: 0 0 8px; }
+nav ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+nav a { color: var(--muted); text-decoration: none; }
+nav a:hover { color: var(--accent); }
+header.hero { margin-bottom: 32px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .07em; font-size: 12px; color: var(--muted); margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 42px); line-height: 1.15; margin: 8px 0 12px; }
+.lede { font-size: 18px; color: var(--muted); max-width: 70ch; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+h2 { font-size: 24px; margin: 56px 0 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+h3 { font-size: 18px; margin: 28px 0 8px; }
+p, li { max-width: 78ch; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.ok { background: var(--ok-bg); color: var(--ok); } .warn { background: var(--warn-bg); color: var(--warn); }
+.gap { background: var(--gap-bg); color: var(--gap); } .info { background: var(--info-bg); color: var(--info); }
+.neutral { border: 1px solid var(--border); color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 16px 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.card h4 { margin: 0 0 6px; font-size: 15px; }
+.card p { margin: 0; font-size: 14px; color: var(--muted); }
+.big { font-size: 26px; font-weight: 700; margin: 4px 0; }
+figure { margin: 20px 0; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+figure img { width: 100%; height: auto; display: block; }
+figcaption { font-size: 13px; color: #61615b; margin-top: 8px; }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+th { font-weight: 600; background: var(--code); }
+tr:last-child td { border-bottom: 0; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--code); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+.callout { border-left: 4px solid var(--accent); background: var(--surface); padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; }
+.callout.warn { border-color: var(--warn); }
+.flow { counter-reset: s; list-style: none; padding: 0; display: grid; gap: 10px; }
+.flow li { counter-increment: s; position: relative; padding: 12px 14px 12px 52px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.flow li::before { content: counter(s); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--bg); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.decision { display: grid; grid-template-columns: 1fr; gap: 4px; }
+footer { margin-top: 64px; font-size: 13px; color: var(--muted); }
+@media (max-width: 880px) { .layout { grid-template-columns: 1fr; } nav { position: static; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav aria-label="Contents">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#outcomes">Developer outcomes</a></li>
+    <li><a href="#scope">Scope</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#flows">User flows</a></li>
+    <li><a href="#guide">What a guide contains</a></li>
+    <li><a href="#evidence">Evidence and trust</a></li>
+    <li><a href="#models">Model providers and keys</a></li>
+    <li><a href="#agent">Research agent</a></li>
+    <li><a href="#time">Time estimates</a></li>
+    <li><a href="#freshness">Freshness</a></li>
+    <li><a href="#hosting">Hosting and cost</a></li>
+    <li><a href="#validation">Validation results</a></li>
+    <li><a href="#decisions">Decision log</a></li>
+    <li><a href="#limits">Limitations and next steps</a></li>
+    <li><a href="#features">Feature index</a></li>
+  </ol>
+</nav>
+<main>
+<header class="hero">
+  <p class="eyebrow">Product requirements · as built · 29 October 2026</p>
+  <h1>OAuth Guide</h1>
+  <p class="lede">A web app that tells developers and agent builders how to register an OAuth app with a provider, how long it takes, what might block them, and where they have to take over from an agent. Every step is tied to an official source that is re-checked before a guide is saved.</p>
+  <div class="meta">
+    <span class="badge info">Python stdlib server</span>
+    <span class="badge info">Bring your own model key</span>
+    <span class="badge ok">6 sample guides</span>
+    <span class="badge warn">Fly.io, one machine</span>
+  </div>
+</header>
+
+<h2 id="problem">Problem</h2>
+<p>A developer building an AI agent wants their users to connect an app. Before launch they may need to create an OAuth app with the provider and get it approved. Today they piece together documentation, work through unfamiliar consoles, and cannot tell whether setup takes an hour or weeks of waiting.</p>
+<p>An <strong>OAuth app</strong> is the provider-side registration for an integration. A <strong>user connection</strong> is one person authorizing through that registration. Registering, testing with your own account, and approval for wider distribution are separate milestones, and each provider handles them differently.</p>
+
+<h2 id="outcomes">Developer outcomes</h2>
+<div class="cards">
+  <div class="card"><h4>Where to start, what next</h4><p>Ordered steps with prerequisites and the console path for each.</p></div>
+  <div class="card"><h4>How hard it is</h4><p>Easy, moderate or hard, with the main reason.</p></div>
+  <div class="card"><h4>Time and waiting</h4><p>Setup time, build time and any approval wait that blocks other users.</p></div>
+  <div class="card"><h4>Agent or you</h4><p>Which steps an agent can do and where the developer must take over, and why.</p></div>
+  <div class="card"><h4>Tested, sourced, uncertain</h4><p>Evidence badges per step, quote checks, and explicit gaps.</p></div>
+  <div class="card"><h4>Shareable</h4><p>Every guide has its own URL and stays in the library for reuse.</p></div>
+</div>
+
+<h2 id="scope">Scope</h2>
+<div class="table-wrap"><table>
+  <tr><th>In scope</th><th>Out of scope</th></tr>
+  <tr><td>Web app: search, library, guide pages, live generation for unfamiliar apps</td><td>Doing setup on the developer's behalf; the product guides, the developer acts</td></tr>
+  <tr><td>Research from official provider documentation, re-checked by a validator</td><td>Testing every app hands-on before publishing (rejected, see decisions)</td></tr>
+  <tr><td>One model connection per visitor: Anthropic, OpenAI or Portkey</td><td>User accounts, saved keys, billing</td></tr>
+  <tr><td>Hands-on testing for a sample (GitHub) in supervised sessions</td><td>Optional marketplace or directory listings as part of OAuth setup</td></tr>
+</table></div>
+
+<h2 id="architecture">Architecture</h2>
+<figure>
+  <img src="oauth-guide-design.png" alt="Architecture: browser pages talk to one Fly.io server holding a library lookup, an in-memory session store, a research job, the validate.py gate and a data volume; the research job calls the visitor's model provider, which reads official docs, and the gate re-fetches those docs before saving.">
+  <figcaption>Source: <code>oauth-guide-design.excalidraw</code>. Model provider and official docs are outside our server.</figcaption>
+</figure>
+<div class="table-wrap"><table>
+  <tr><th>Part</th><th>File</th><th>Role</th></tr>
+  <tr><td>Web server</td><td><code>mock/server.py</code></td><td>Standard-library HTTP server: pages, library lookup, sessions, research jobs, status and activity, regenerate and re-check</td></tr>
+  <tr><td>Providers</td><td><code>mock/providers.py</code></td><td>Builds the Anthropic, OpenAI or Portkey client and runs the connection check</td></tr>
+  <tr><td>Research agents</td><td><code>mock/research.py</code></td><td>Streams the model's research, turns events into activity lines, runs one repair round</td></tr>
+  <tr><td>Validator</td><td><code>mock/validate.py</code></td><td>Re-fetches cited pages, matches quotes, anchors domains, checks time and handoff fields</td></tr>
+  <tr><td>Pages</td><td><code>mock/static/</code></td><td>Search and connect, research feed, guide page, browse</td></tr>
+  <tr><td>Seed guides</td><td><code>mock/seed-guides/</code></td><td>Copied into the data volume on first start; never overwrite saved guides</td></tr>
+</table></div>
+
+<h2 id="flows">User flows</h2>
+<h3>Find a guide</h3>
+<ol class="flow">
+  <li>Developer types an app name, website or documentation URL.</li>
+  <li>Lookup normalizes it, so <code>GitHub</code>, <code>github.com</code> and a <code>docs.github.com</code> URL find the same guide.</li>
+  <li>A saved guide opens immediately. No model key is needed.</li>
+</ol>
+<h3>Generate a guide for an unfamiliar app</h3>
+<ol class="flow">
+  <li>With no model connected, the page asks the developer to connect one.</li>
+  <li>The developer picks one provider and pastes one key. A cheap call checks it; the key stays masked until it passes.</li>
+  <li>The research job starts. The research page shows a live feed: searches, pages read, short thinking summaries, the quote checks, and an elapsed timer with "usually 2–5 minutes".</li>
+  <li>The validator re-fetches every cited page. The guide is saved, complete or Incomplete, and opens.</li>
+</ol>
+<h3>Refresh an old guide</h3>
+<ol class="flow">
+  <li>Guides older than one day show a banner. Saved guides are always served first.</li>
+  <li><strong>Regenerate</strong> runs a full research with the visitor's model. The old guide stays live until the new one passes and is kept as the previous version.</li>
+  <li><strong>Re-check sources only</strong> (for guides with hands-on test results) re-fetches every page and re-checks every quote with no model, keeping the test records.</li>
+</ol>
+
+<h2 id="guide">What a guide contains</h2>
+<div class="table-wrap"><table>
+  <tr><th>Field</th><th>Meaning</th></tr>
+  <tr><td>Difficulty</td><td>Easy, moderate or hard, with the main reason</td></tr>
+  <tr><td>OAuth setup time</td><td>Console work to the first successful sign-in; measured where we ran a timed test</td></tr>
+  <tr><td>Building it into your app</td><td>Callback, token storage, refresh and first API call; always an estimate with stated assumptions</td></tr>
+  <tr><td>Approval wait</td><td>Only reviews that block other users from connecting, quoted from the provider when possible</td></tr>
+  <tr><td>Steps</td><td>Title, detail, settings with explanations, evidence level, who does it, handoff reason, time, source and exact quote</td></tr>
+  <tr><td>Agent vs you</td><td>Lists built from each step's <code>who</code> and <code>handoff</code> fields</td></tr>
+  <tr><td>Gaps</td><td>What is unknown, whether it blocks completion, and the next action</td></tr>
+  <tr><td>Sources and domains</td><td>Every cited page, plus the domains treated as official and which model researched the guide</td></tr>
+  <tr><td>Age</td><td>The newest of generated, re-checked and validated dates</td></tr>
+</table></div>
+<p>Evidence levels: <span class="badge info">Documented</span> <span class="badge warn">Console observed</span> <span class="badge ok">Authorization tested</span>. A guide's overall badge is <span class="badge ok">All steps source-checked</span> or <span class="badge gap">Incomplete</span>.</p>
+
+<h2 id="evidence">Evidence and trust</h2>
+<ul>
+  <li>Only official provider documentation counts as a source.</li>
+  <li>Each step quotes one or two sentences copied exactly from a page the agent fetched.</li>
+  <li>The validator fetches the page again and checks the quote is there. Matching ignores tags, whitespace, curly versus straight quotes, letter case, and Markdown code or bold marks; it does not accept paraphrase.</li>
+  <li>Only domains the research actually fetched, or the visitor's docs URL, count as official. Others are dropped and recorded as a gap.</li>
+  <li>A failed quote marks that step unverified and the guide Incomplete; a critical gap also keeps it Incomplete. Saving never upgrades evidence.</li>
+  <li>"Authorization tested" requires a test record from a real run.</li>
+  <li>Activity lines and guide text are always shown as text, never as HTML.</li>
+</ul>
+<div class="callout">Production would add: a headless-browser fallback for pages that need JavaScript, provider-published Markdown sources, a per-step record of fetch method and text hash, per-domain failure monitoring, and a human "verify manually" path. A model may flag likely support but never marks a step verified.</div>
+
+<h2 id="models">Model providers and keys</h2>
+<div class="table-wrap"><table>
+  <tr><th>Provider</th><th>Research tools</th><th>Live status</th></tr>
+  <tr><td>Anthropic (direct key)</td><td>Claude web search and web fetch; default model <code>claude-opus-5-5</code>; server-side refusal fallbacks enabled</td><td><span class="badge warn">Key check tested; no live research run</span></td></tr>
+  <tr><td>OpenAI</td><td>Responses API with web search; schema-constrained JSON output</td><td><span class="badge warn">Stub-tested only</span></td></tr>
+  <tr><td>Portkey (gateway to Claude)</td><td>Same Claude tools through Portkey's Anthropic-compatible route; virtual key or Model Catalog provider slug</td><td><span class="badge ok">Two live runs (Gmail, GitLab)</span></td></tr>
+</table></div>
+<ul>
+  <li>One provider per visitor. The key is posted once, held in server memory against an HttpOnly, SameSite=Strict cookie, and dropped after two idle hours or a restart.</li>
+  <li>Keys are never logged, written to disk, or returned to the page; a self-check asserts this.</li>
+  <li>Model usage is billed to the visitor's account.</li>
+</ul>
+
+<h2 id="agent">Research agent</h2>
+<ul>
+  <li>The prompt restricts sources to official docs, requires exact quotes, sets evidence to Documented, and treats the visitor's request as data, not instructions.</li>
+  <li>The guide comes back through a strict <code>submit_guide</code> tool (Claude) or strict JSON schema (OpenAI), so the shape is guaranteed.</li>
+  <li>The validator's findings go back to the model once for repair; the result is saved either way, with failures visible.</li>
+  <li>Calls stream, so the feed shows each search, page read and thinking summary as it happens. Paused server-tool turns resume automatically.</li>
+  <li>At most three jobs run at once; repeat searches join a running job.</li>
+</ul>
+
+<h2 id="time">Time estimates</h2>
+<div class="table-wrap"><table>
+  <tr><th>Source</th><th>Used for</th><th>How</th></tr>
+  <tr><td><span class="badge ok">Measured</span></td><td>GitHub: register 37 s, secret with Confirm access 76 s, first authorization 26 s</td><td>Timed run on 28 October 2026, with Claude driving Chrome; a lower bound for a person</td></tr>
+  <tr><td><span class="badge neutral">Hand estimate</span></td><td>Other steps of the seed guides</td><td>Engineering judgment per step, with reasoning and stated assumptions</td></tr>
+  <tr><td><span class="badge neutral">Model estimate</span></td><td>Generated guides</td><td>The research model fills min, max and reason per step; the validator checks format only</td></tr>
+</table></div>
+<p>Cards add up each phase's minimums and maximums. Assumptions shown on every guide: an experienced developer, an existing HTTPS backend with a secret store and token database, and a standard OAuth library; excluding customer admin approvals, security review and rollout.</p>
+<div class="callout warn"><strong>Known inconsistency.</strong> Build estimates differ by who wrote them: GitHub 4.5–11.5 h and Jira 5–13 h by hand, GitLab 1–3.7 h by the model, for the same kind of work. Planned fix: one shared baseline for standard build tasks, with the model adding only provider-specific extras and the validator flagging outliers.</div>
+
+<h2 id="freshness">Freshness</h2>
+<p>Saved guides are always served. After one day the guide offers <strong>Regenerate</strong> (needs a connected model) and, for tested guides, <strong>Re-check sources only</strong> (no model). Regeneration of a tested guide asks for confirmation, because a docs-only run cannot reproduce hands-on test evidence.</p>
+
+<h2 id="hosting">Hosting and cost</h2>
+<div class="cards">
+  <div class="card"><h4>Fly.io</h4><div class="big">~$2.50–4/mo</div><p>One shared-cpu machine, 512 MB, always on; 1 GB volume at <code>/data</code>.</p></div>
+  <div class="card"><h4>Per new guide</h4><div class="big">~$0.45–2.25</div><p>On the visitor's key; Sonnet-class at the low end, Opus at the high end. Unmeasured estimate.</p></div>
+  <div class="card"><h4>Why one machine</h4><p>Keys and running jobs live in process memory, so auto-stop is off and the app cannot scale out.</p></div>
+</div>
+<p>Local development runs <code>python mock/server.py</code>. With no model connected locally, a miss can be queued for a Claude Code session watching the request folder; production disables this.</p>
+
+<h2 id="validation">Validation results</h2>
+<div class="table-wrap"><table>
+  <tr><th>Guide</th><th>How it was produced</th><th>Result</th></tr>
+  <tr><td>GitHub (OAuth App)</td><td>Two hands-on runs: registration, secret, consent, token exchange, one <code>GET /user</code>; second run timed</td><td><span class="badge ok">11/11 quotes</span> token exchange 200, API 200, no scopes</td></tr>
+  <tr><td>Jira Cloud (3LO)</td><td>Docs plus the developer console up to the create form</td><td><span class="badge gap">Incomplete</span> 16/16 quotes; creation blocked on the developer-terms checkbox</td></tr>
+  <tr><td>Linear</td><td>Live research (Claude in a supervised session)</td><td><span class="badge ok">10/10 quotes</span> docs only</td></tr>
+  <tr><td>Slack</td><td>Live research (Claude in a supervised session)</td><td><span class="badge ok">14/14 quotes</span> docs only</td></tr>
+  <tr><td>Gmail</td><td>In-app research through Portkey</td><td><span class="badge gap">Incomplete</span> 9/9 quotes; project-creation page not fetched</td></tr>
+  <tr><td>GitLab</td><td>In-app research through Portkey</td><td><span class="badge ok">11/11 quotes</span> after the Markdown quote fix</td></tr>
+</table></div>
+<h3>What we learned and corrected</h3>
+<ul>
+  <li><strong>Signed in is not enough.</strong> GitHub asked for Confirm access when generating a secret on both runs; it became a "you take over" step.</li>
+  <li><strong>Marketplace review is not OAuth setup.</strong> Slack (up to 10 business days plus up to 10 weeks) and Atlassian (10–15 business days) apply only to optional listings; guides now show approval waits only when they block other users.</li>
+  <li><strong>Quotes copied from Markdown.</strong> A correct GitLab quote failed because web fetch returns Markdown with backticks; matching now ignores code and bold marks.</li>
+  <li><strong>Docs render without JavaScript.</strong> Atlassian, GitHub and Google pages all returned their text to a plain fetch.</li>
+  <li><strong>Gmail's real blocker is verification.</strong> Sensitive or restricted scopes for public apps need Google verification and, for restricted scopes, a security assessment.</li>
+</ul>
+
+<h2 id="decisions">Decision log</h2>
+<div class="table-wrap"><table>
+  <tr><th>Decision</th><th>Why</th><th>Rejected</th></tr>
+  <tr><td>Web app</td><td>The brief asks for a shareable link and live generation</td><td>Skill, MCP server or HTTP API first</td></tr>
+  <tr><td>Generate from sources, test a sample</td><td>The brief says attempt setup "as practical" and expects live generation; human-only checks block automated tests</td><td>Test every app before publishing</td></tr>
+  <tr><td>Visitor brings one key</td><td>No model cost for us; visitor controls spend</td><td>Our key; all three keys required</td></tr>
+  <tr><td>Fly.io server</td><td>Same evidence check for every provider; no browser-access limits; library persists</td><td>GitHub Pages with research in the browser; library-only site with no generation</td></tr>
+  <tr><td>Approval wait = gating reviews only</td><td>Optional listings were being read as "OAuth takes two weeks"</td><td>Counting marketplace review as setup time</td></tr>
+  <tr><td>Setup and build times separate</td><td>Developers ask both "how long to get it working" and "how long to build it in"</td><td>One combined effort figure</td></tr>
+  <tr><td>Visitor chooses to refresh</td><td>Keeps cost with the visitor and protects tested evidence</td><td>Automatic regeneration after one day</td></tr>
+  <tr><td>Standard library server</td><td>Nothing to install beyond two provider SDKs</td><td>A web framework</td></tr>
+</table></div>
+
+<h2 id="limits">Limitations and next steps</h2>
+<ul>
+  <li>The in-app agent reads documentation; it never signs in to a provider. Hands-on tests exist only for GitHub.</li>
+  <li>Direct Anthropic and OpenAI research paths have not run live.</li>
+  <li>Time estimates are not calibrated; the shared build baseline is planned.</li>
+  <li>Pages that need JavaScript would fail the quote check rather than pass.</li>
+  <li>Keys and jobs are lost on restart; one machine only.</li>
+  <li>Next: shared time baseline, "if this step fails" help, a downloadable "test it yourself" kit per provider, and the production evidence checks above.</li>
+</ul>
+
+<h2 id="features">Feature index</h2>
+<div class="table-wrap"><table>
+  <tr><th>Area</th><th>Commits</th></tr>
+  <tr><td>Server, pages, lookup, browse</td><td><code>41ea247</code> <code>ee6934e</code> <code>5e3ad47</code> <code>2bcf91a</code></td></tr>
+  <tr><td>Validator and evidence</td><td><code>0dd8201</code> <code>f2a925e</code> <code>e89b1a9</code></td></tr>
+  <tr><td>Seed guides</td><td><code>869b36a</code> <code>294a31e</code> <code>84ce2f2</code> <code>6984cc2</code></td></tr>
+  <tr><td>Time, difficulty, handoffs</td><td><code>99481c0</code> <code>7eec1b4</code> <code>86186c2</code> <code>7ee329d</code> <code>52dad07</code> <code>f5e41ff</code> <code>e63290d</code></td></tr>
+  <tr><td>Model connection and providers</td><td><code>c60cf48</code> <code>3360040</code> <code>15759b4</code></td></tr>
+  <tr><td>Research agents and pipeline</td><td><code>7f644c2</code> <code>e7a30d8</code> <code>4874117</code> <code>0240941</code></td></tr>
+  <tr><td>Live activity feed</td><td><code>c58b1a5</code> <code>d1c9dfe</code> <code>2e42789</code> <code>5d29ba9</code></td></tr>
+  <tr><td>Freshness</td><td><code>07eeee6</code> <code>7777fc1</code> <code>0548e4b</code></td></tr>
+  <tr><td>Data and deployment</td><td><code>041bf59</code> <code>2dc5356</code></td></tr>
+</table></div>
+
+<footer>Supersedes the brainstorming notes in <code>PRD.md</code>. Diagram: <code>oauth-guide-design.excalidraw</code>.</footer>
+</main>
+</div>
+</body>
+</html>
