@@ -1,0 +1,9 @@
+.git
+.venv
+.claude
+research
+mock/data
+**/__pycache__
+PRD.md
+*.png
+*.excalidraw
