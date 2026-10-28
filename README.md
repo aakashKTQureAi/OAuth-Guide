@@ -3,6 +3,7 @@
 Look up an app and get a shareable guide to registering its OAuth app: where to start, each step, how hard it is, how long setup and build take, any approval wait that blocks other users, and which steps an agent can do versus where you take over. Every step quotes the provider's official docs, and the quotes are re-checked before a guide is saved.
 
 - **Live:** https://oauth-guide.fly.dev
+- **Demo video** (live guide generation): https://youtu.be/jAY_YAmlmho
 - **Full product write-up** (architecture, decisions, validation results): [`PRD.html`](PRD.html), diagram in [`oauth-guide-design.png`](oauth-guide-design.png)
 
 ## Using it
