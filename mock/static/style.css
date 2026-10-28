@@ -98,3 +98,12 @@ p.time { font-size: 14px; color: var(--muted); margin: 6px 0; }
 p.handoff { font-size: 14px; color: var(--warn); margin: 4px 0; }
 p.difficulty { margin: 12px 0 0; }
 .card ul.plain { margin: 6px 0 0; font-size: 15px; }
+.chip.off { color: var(--muted); }
+button.link { background: none; color: var(--accent); padding: 0; font-weight: 400; font-size: 13px; text-decoration: underline; }
+section.connect { max-width: 760px; margin: 12px auto 0; padding: 0 16px; }
+section.connect summary { cursor: pointer; color: var(--accent); font-size: 15px; }
+.conn-form { display: grid; gap: 10px; margin-top: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.conn-form label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
+.conn-form input, .conn-form select { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); min-width: 0; }
+.conn-form button { justify-self: start; }
+.conn-form label[hidden] { display: none; }

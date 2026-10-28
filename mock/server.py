@@ -3,8 +3,10 @@
 Usage: python3 mock/server.py               serve on 127.0.0.1:8780
        python3 mock/server.py --self-check
 """
-import datetime, http.server, json, re, sys, urllib.parse
+import datetime, http.server, json, re, secrets, sys, threading, time, urllib.parse
 from pathlib import Path
+
+import providers
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "static"
@@ -13,6 +15,38 @@ QUEUE = ROOT / "queue"
 PORT = 8780
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 HOST_PREFIXES = ("www.", "docs.", "developer.", "developers.", "api.", "app.")
+SESSION_TTL = 2 * 3600
+MAX_SESSIONS = 1000
+SESSIONS = {}  # sid -> {"conn": {...}, "seen": t}; memory only, so keys vanish on restart
+SESSIONS_LOCK = threading.Lock()
+
+
+def session_get(sid):
+    with SESSIONS_LOCK:
+        now = time.monotonic()
+        for k in [k for k, v in SESSIONS.items() if now - v["seen"] > SESSION_TTL]:
+            del SESSIONS[k]
+        entry = SESSIONS.get(sid)
+        if entry:
+            entry["seen"] = now
+        return entry["conn"] if entry else None
+
+
+def session_put(sid, conn):
+    with SESSIONS_LOCK:
+        if sid not in SESSIONS and len(SESSIONS) >= MAX_SESSIONS:
+            del SESSIONS[min(SESSIONS, key=lambda k: SESSIONS[k]["seen"])]
+        SESSIONS[sid] = {"conn": conn, "seen": time.monotonic()}
+
+
+def session_drop(sid):
+    with SESSIONS_LOCK:
+        SESSIONS.pop(sid, None)
+
+
+def public_conn(conn):
+    """What the page may see about a connection: never the key."""
+    return {"connected": bool(conn), "provider": conn and conn["provider"], "model": conn and conn["model"]}
 
 
 def load_guides():
@@ -65,9 +99,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
-    def send_json(self, status, body):
+    def sid(self):
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            name, _, value = part.strip().partition("=")
+            if name == "sid" and re.fullmatch(r"[A-Za-z0-9_-]{20,64}", value):
+                return value
+        return None
+
+    def send_json(self, status, body, cookie=None):
         data = json.dumps(body).encode()
         self.send_response(status)
+        if cookie:
+            secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+            self.send_header("Set-Cookie", f"sid={cookie}; HttpOnly; SameSite=Strict; Path=/{secure}")
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -80,6 +124,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 "status": g.get("verification", {}).get("status", "unchecked"),
                 "checked_at": g.get("verification", {}).get("checked_at"),
             } for g in load_guides()])
+        if self.path == "/api/connection":
+            return self.send_json(200, public_conn(session_get(self.sid())))
         if self.path.startswith("/api/status/"):
             slug = self.path.removeprefix("/api/status/")
             if not SLUG.match(slug):
@@ -92,7 +138,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json(404, {"state": "unknown"})
         return super().do_GET()
 
+    def read_json(self, limit=2048):
+        length = int(self.headers.get("Content-Length") or 0)
+        if not 0 < length <= limit or self.headers.get("Content-Type") != "application/json":
+            return None
+        try:
+            body = json.loads(self.rfile.read(length))
+        except ValueError:
+            return None
+        return body if isinstance(body, dict) else None
+
     def do_POST(self):
+        if self.path == "/api/connect":
+            return self.connect()
+        if self.path == "/api/disconnect":
+            session_drop(self.sid())
+            return self.send_json(200, public_conn(None))
         if self.path != "/api/lookup":
             return self.send_json(404, {"error": "not found"})
         length = int(self.headers.get("Content-Length") or 0)
@@ -121,6 +182,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return self.send_json(202, {"found": False, "slug": slug})
 
 
+    def connect(self):
+        body = self.read_json() or {}
+        provider = body.get("provider")
+        conn = {"provider": provider, "api_key": str(body.get("api_key") or "").strip(),
+                "model": str(body.get("model") or "").strip() or providers.DEFAULT_MODELS.get(provider, ""),
+                "portkey_provider": str(body.get("portkey_provider") or "").strip()}
+        if provider not in providers.PROVIDERS or not conn["api_key"] or not conn["model"] or len(conn["api_key"]) > 512:
+            return self.send_json(400, {"error": "Choose a provider and enter a key and model."})
+        try:
+            providers.check(conn)
+        except providers.ConnectionFailed as exc:
+            return self.send_json(400, {"error": str(exc)})
+        sid = self.sid() or secrets.token_urlsafe(32)
+        session_put(sid, conn)
+        return self.send_json(200, public_conn(conn), cookie=sid)
+
+
 def self_check():
     guides = [{"slug": "github", "aliases": ["github", "github.com"], "domains": ["docs.github.com"]},
               {"slug": "jira", "aliases": ["jira", "atlassian.net"], "domains": ["developer.atlassian.com"]}]
@@ -135,7 +213,45 @@ def self_check():
     assert parse_query("https://developers.linear.app/docs/oauth")[2] == "https://developers.linear.app/docs/oauth"
     assert parse_query("linear.app")[2] is None
     assert not SLUG.match("../etc") and not SLUG.match("")
+    check_connect_endpoint()
     print("SELF_CHECK_PASSED")
+
+
+def check_connect_endpoint():
+    """Run the real handler on a spare port with a stubbed provider check; the key must never come back."""
+    import io, contextlib, urllib.request
+    key = "sk-test-NEVER-ECHO-" + secrets.token_hex(8)
+    real_check = providers.check
+    providers.check = lambda conn: None if conn["api_key"] == key else (_ for _ in ()).throw(providers.ConnectionFailed("The key was rejected."))
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    log = io.StringIO()
+    def call(path, body=None, cookie=None):
+        req = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None,
+                                     headers={"Content-Type": "application/json", **({"Cookie": cookie} if cookie else {})})
+        try:
+            with urllib.request.urlopen(req) as r:
+                return r.status, r.headers.get("Set-Cookie"), r.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, None, e.read().decode()
+    try:
+        with contextlib.redirect_stderr(log):
+            st, _, text = call("/api/connect", {"provider": "anthropic", "api_key": "wrong"})
+            assert st == 400 and "rejected" in text
+            st, cookie, text = call("/api/connect", {"provider": "anthropic", "api_key": key})
+            assert st == 200 and key not in text and "HttpOnly" in cookie and "SameSite=Strict" in cookie
+            sid = cookie.split(";")[0]
+            st, _, text = call("/api/connection", cookie=sid)
+            assert json.loads(text) == {"connected": True, "provider": "anthropic", "model": "claude-opus-5-5"} and key not in text
+            st, _, text = call("/api/connect", {"provider": "nope", "api_key": key})
+            assert st == 400
+            call("/api/disconnect", {}, cookie=sid)
+            assert json.loads(call("/api/connection", cookie=sid)[2])["connected"] is False
+        assert key not in log.getvalue(), "key must never reach the request log"
+    finally:
+        srv.shutdown()
+        providers.check = real_check
 
 
 if __name__ == "__main__":

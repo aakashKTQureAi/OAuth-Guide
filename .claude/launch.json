@@ -3,8 +3,10 @@
   "configurations": [
     {
       "name": "oauth-guide-mock",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["mock/server.py"],
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": [
+        "mock/server.py"
+      ],
       "port": 8780
     }
   ]
