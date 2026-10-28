@@ -86,6 +86,12 @@ def review_problems(guide, fetch, progress=None):
     return [f"{r['id']}: {r['reason']} ({r['url']})" for r in v["results"] if not r["ok"]] + validate.time_errors(guide)
 
 
+def canonical_slug(name):
+    """Slug from the app's name as the research found it: 'GitHub (OAuth App)' -> 'github'."""
+    slug = re.sub(r"[^a-z0-9]+", "-", name.split("(")[0].strip().lower()).strip("-")[:63]
+    return slug if SLUG.match(slug) else ""
+
+
 def run_job(request, conn):
     """Research, gate with validate.py, save. conn holds the visitor's key only for this thread's lifetime."""
     slug = request["slug"]
@@ -110,11 +116,20 @@ def run_job(request, conn):
         v = guide["verification"]
         say(f"{sum(r['ok'] for r in v['results'])} of {len(v['results'])} quotes confirmed; saved. Opening the guide…")
         guide["generated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
-        current = GUIDES / f"{slug}.json"
-        if current.exists():  # keep the replaced guide one step back
-            write_atomic(GUIDES / f"{slug}.previous.json", json.loads(current.read_text()))
+        # Save under the app's real name, not what was typed ("discorf" -> discord); regenerations keep their slug.
+        final = slug if request.get("regenerate") else canonical_slug(guide.get("name", "")) or slug
+        guide["slug"] = final
+        guide["aliases"] = sorted(set(guide.get("aliases", [])) | {final, slug, guide.get("name", "").split("(")[0].strip().lower()} - {""})
+        current = GUIDES / f"{final}.json"
+        if current.exists():  # keep the replaced guide one step back, and its aliases
+            old = json.loads(current.read_text())
+            write_atomic(GUIDES / f"{final}.previous.json", old)
+            guide["aliases"] = sorted(set(guide["aliases"]) | set(old.get("aliases", [])))
         write_atomic(current, guide)
-        (QUEUE / f"{slug}.json").unlink(missing_ok=True)
+        if final == slug:
+            (QUEUE / f"{slug}.json").unlink(missing_ok=True)
+        else:  # the research page is polling the typed slug: point it at the saved guide
+            update_request(slug, state="ready", guide=final)
     except research.ResearchFailed as exc:
         update_request(slug, state="failed", note=str(exc))
     except Exception as exc:  # never leave a request stuck in "researching"
@@ -461,6 +476,18 @@ def check_pipeline():
         failed = json.loads((QUEUE / "beta.json").read_text())
         assert failed["state"] == "failed" and "declined" in failed["note"] and key not in json.dumps(failed)
         assert not JOBS
+        guide["name"] = "Acme Cloud (OAuth 2.0)"
+        research.RESEARCHERS["anthropic"] = fake
+        write_atomic(QUEUE / "acmee.json", {"slug": "acmee", "state": "queued"})
+        run_job({"slug": "acmee", "query": "acmee"}, conn)
+        renamed = json.loads((GUIDES / "acme-cloud.json").read_text())
+        assert renamed["slug"] == "acme-cloud" and {"acmee", "acme cloud", "acme-cloud"} <= set(renamed["aliases"])
+        assert json.loads((QUEUE / "acmee.json").read_text())["guide"] == "acme-cloud"
+        assert not (GUIDES / "acmee.json").exists()
+        assert find_guide("acme cloud", load_guides())["slug"] == "acme-cloud"
+        assert canonical_slug("GitHub (OAuth App)") == "github" and canonical_slug("(x)") == ""
+        (GUIDES / "acme-cloud.json").unlink()
+        guide["name"] = "Acme"
         research.RESEARCHERS["anthropic"] = fake
         write_atomic(QUEUE / "acme.json", {"slug": "acme", "state": "queued"})
         run_job({"slug": "acme", "query": "Acme", "regenerate": True}, conn)

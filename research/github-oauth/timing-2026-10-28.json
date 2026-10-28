@@ -1,0 +1,27 @@
+{
+  "run": "GitHub OAuth App timed setup, second end-to-end run",
+  "date": "2026-10-28",
+  "executor": "Claude driving the user's Chrome via Claude in Chrome; user completed GitHub Confirm access",
+  "app": "OAuth Guide timing run (new test OAuth App, loopback callback, no scopes)",
+  "segments_seconds": {
+    "register_app": 37,
+    "generate_secret_including_confirm_access_and_secure_handoff": 76,
+    "consent_callback_exchange_and_api_read": 26
+  },
+  "total_wall_clock_seconds": 172,
+  "result": {
+    "state_valid": true,
+    "pkce_used": true,
+    "token_exchange_http_status": 200,
+    "granted_scopes_empty": true,
+    "api": "GET /user",
+    "api_http_status": 200
+  },
+  "limits": [
+    "One run, automation speed; a person reading the form and docs will be slower.",
+    "Confirm access time depends on the user's method (password, passkey, mobile).",
+    "Measures console setup and one authorization only, not writing production callback, token storage or refresh code.",
+    "Includes agent think time between steps; excludes the earlier harness preparation."
+  ],
+  "left_in_place": "Test OAuth App 'OAuth Guide timing run', one client secret and a public-data grant remain on the user's GitHub account; tokens were discarded with the harness process."
+}

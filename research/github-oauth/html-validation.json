@@ -1,0 +1,28 @@
+{
+  "source_sha256": "ce8ebd180e04b40f14f6e7d38bce2917ce91a06e9545da57964a66bf9c977438",
+  "embedded_images": 4,
+  "source_h2_sections": 6,
+  "claude_contribution": "Generic CSS authored through authenticated Claude CLI; no local guide payload sent",
+  "portable": true,
+  "content_text_fragments_checked": 275,
+  "missing_source_fragments": [],
+  "external_source_links_preserved": 12,
+  "source_download_byte_identical": true,
+  "no_script_iframe_form_or_remote_style": true,
+  "browser_checks": {
+    "desktop": "1440x1000",
+    "mobile": "390x844",
+    "page_horizontal_overflow": false,
+    "mobile_table_horizontal_overflow": false,
+    "embedded_images_loaded": 4,
+    "broken_internal_anchors": 0,
+    "json_disclosure": "passed",
+    "console_errors": 0
+  },
+  "limits": [
+    "No further GitHub/OAuth tests",
+    "External sources preserved but not re-fetched",
+    "Print styles present; printed output not tested",
+    "Client source and editable workflow remain separate companion files"
+  ]
+}

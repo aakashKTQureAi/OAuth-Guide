@@ -1,0 +1,18 @@
+{
+  "callback_received": true,
+  "state_valid": true,
+  "pkce_used": true,
+  "requested_scopes": [],
+  "token_exchange_succeeded": true,
+  "authenticated_api_read": true,
+  "refresh_tested": false,
+  "token_exchange_http_status": 200,
+  "granted_scopes_empty": true,
+  "expiring_access_token": true,
+  "refresh_token_returned": true,
+  "api_method": "GET",
+  "api_path": "/user",
+  "api_http_status": 200,
+  "response_has_account_identity": true,
+  "api_scope_header_empty": true
+}

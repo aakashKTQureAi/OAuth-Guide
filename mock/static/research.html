@@ -53,7 +53,7 @@
     async function poll() {
       const res = await fetch(`/api/status/${encodeURIComponent(slug)}`, { cache: "no-store" });
       const status = await res.json();
-      if (status.state === "ready") { location.href = `/guide.html?slug=${encodeURIComponent(slug)}`; return; }
+      if (status.state === "ready") { location.href = `/guide.html?slug=${encodeURIComponent(status.guide || slug)}`; return; }
       if (!res.ok) { document.getElementById("note").textContent = "No research request found. Start from the search page."; return; }
       if (status.state === "failed") {
         showActivity(status.activity || []);
