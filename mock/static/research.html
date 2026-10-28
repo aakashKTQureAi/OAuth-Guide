@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Researching — OAuth Guide</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/">OAuth Guide</a>
+    <span class="chip"><span class="dot"></span>Agent: Claude (this session)</span>
+  </header>
+  <main>
+    <p class="eyebrow">No saved guide yet</p>
+    <h1 id="title">Researching…</h1>
+    <p class="lede">The research agent is reading official documentation. Every step must quote an official page, and the evidence check runs before the guide is saved.</p>
+    <ol class="progress" id="progress">
+      <li data-state="queued">Request queued</li>
+      <li data-state="researching">Reading official sources</li>
+      <li data-state="validating">Checking every quote against its source</li>
+      <li data-state="ready">Guide saved to the library</li>
+    </ol>
+    <p class="card" id="note" aria-live="polite">Waiting for the research agent…</p>
+  </main>
+  <script>
+    const slug = new URLSearchParams(location.search).get("slug") || "";
+    const order = ["queued", "researching", "validating", "ready"];
+    document.getElementById("title").textContent = `Researching ${slug}…`;
+    async function poll() {
+      const res = await fetch(`/api/status/${encodeURIComponent(slug)}`, { cache: "no-store" });
+      const status = await res.json();
+      if (status.state === "ready") { location.href = `/guide.html?slug=${encodeURIComponent(slug)}`; return; }
+      if (!res.ok) { document.getElementById("note").textContent = "No research request found. Start from the search page."; return; }
+      const at = order.indexOf(status.state);
+      document.querySelectorAll("#progress li").forEach((li, i) => li.className = i < at ? "done" : i === at ? "active" : "");
+      document.getElementById("note").textContent = status.note || "";
+      setTimeout(poll, 2000);
+    }
+    poll();
+  </script>
+</body>
+</html>

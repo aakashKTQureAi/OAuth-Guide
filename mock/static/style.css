@@ -89,3 +89,8 @@ details.source blockquote { margin: 6px 0 0; padding-left: 10px; border-left: 3p
 section ul li a { overflow-wrap: anywhere; }
 ul.library { list-style: none; padding: 0; display: grid; gap: 12px; }
 ul.library p { margin: 6px 0 0; }
+ol.progress { padding-left: 22px; color: var(--muted); }
+ol.progress li { margin-bottom: 6px; }
+ol.progress li.done { color: var(--ok); }
+ol.progress li.done::after { content: " ✓"; }
+ol.progress li.active { color: var(--text); font-weight: 600; }

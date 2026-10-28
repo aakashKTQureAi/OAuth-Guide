@@ -22,5 +22,20 @@
     <p class="secondary"><a href="/browse.html">Browse existing guides</a></p>
     <p class="promise">Every step links to an official source checked on the date shown. Gaps stay visible. A guide is not a promise of provider approval.</p>
   </main>
+  <script>
+    document.getElementById("search").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const error = document.getElementById("error");
+      error.textContent = "";
+      const res = await fetch("/api/lookup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: document.getElementById("q").value }),
+      });
+      const body = await res.json();
+      if (!res.ok) { error.textContent = body.error; return; }
+      const slug = encodeURIComponent(body.slug);
+      location.href = body.found ? `/guide.html?slug=${slug}` : `/research.html?slug=${slug}`;
+    });
+  </script>
 </body>
 </html>
