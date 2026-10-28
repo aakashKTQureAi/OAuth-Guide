@@ -46,17 +46,24 @@ function timeNote(t) {
     ` ${label} — ${t.basis}`);
 }
 
-function activeCard(g) {
-  const times = g.steps.map(s => s.time).filter(Boolean);
-  if (!times.length) return effortCard("Your active effort", g.effort?.active);
+function phaseCard(g, phase, label) {
+  const times = g.steps.map(s => s.time).filter(t => t?.phase === phase);
+  if (!times.length) return null;
   const sum = (kind, key) => times.filter(t => !kind || t.kind === kind).reduce((n, t) => n + t[key], 0);
   const measured = times.filter(t => t.kind === "measured");
+  const note = !measured.length ? "Estimate, not measured."
+    : measured.length === times.length ? "Measured in a timed run."
+    : `${fmtRange(sum("measured", "min_minutes"), sum("measured", "max_minutes"))} measured in a timed run; the rest is an estimate.`;
   return el("div", { class: "card" },
-    el("div", { class: "label" }, "Your active effort"),
+    el("div", { class: "label" }, label),
     el("div", { class: "value" }, fmtRange(sum(null, "min_minutes"), sum(null, "max_minutes"))),
-    el("p", { class: "hint" },
-      measured.length ? `${fmtRange(sum("measured", "min_minutes"), sum("measured", "max_minutes"))} measured in a timed run; the rest is an estimate, not measured. ` : "Estimate, not measured. ",
-      `Assumes ${g.effort?.assumptions || "nothing stated"}.`));
+    el("p", { class: "hint" }, note));
+}
+
+function timeCards(g) {
+  const cards = [phaseCard(g, "setup", "OAuth setup: console to first sign-in"), phaseCard(g, "build", "Building it into your app")].filter(Boolean);
+  if (!cards.length) cards.push(effortCard("Your active effort", g.effort?.active));
+  return cards;
 }
 
 function effortCard(label, item) {
@@ -105,8 +112,9 @@ function render(g) {
       el("span", { class: `badge ${status === "complete" ? "ok" : "gap"}` }, status === "complete" ? "All steps source-checked" : status === "incomplete" ? "Incomplete" : "Not checked"),
       el("span", { class: "hint" }, v ? `Checked ${v.checked_at} · ${v.method}` : "No evidence check recorded.")),
     el("p", { class: "lede" }, g.summary),
-    el("section", { class: "cards" }, activeCard(g),
-      el("div", {}, effortCard("Provider waiting time", g.effort?.wait), g.effort?.wait?.source ? checkNote(results["provider-wait"]) : null)),
+    el("section", { class: "cards" }, timeCards(g),
+      el("div", {}, effortCard("Approval wait before other users can connect", g.effort?.wait), g.effort?.wait?.source ? checkNote(results["provider-wait"]) : null)),
+    g.effort?.assumptions ? el("p", { class: "hint" }, `Times assume ${g.effort.assumptions}.`) : null,
     prereqs.length ? el("section", {}, el("h2", {}, "Before you start"), el("ul", { class: "plain" }, prereqs)) : null,
     el("section", {}, el("h2", {}, "Steps"), el("ol", { class: "steps" }, steps)),
     el("section", {}, el("h2", {}, "Gaps and open questions"),

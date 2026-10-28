@@ -72,6 +72,8 @@ def time_errors(guide):
         lo, hi = t.get("min_minutes"), t.get("max_minutes")
         if t.get("kind") not in ("measured", "estimate"):
             errors.append(f"{step['id']}: time.kind must be measured or estimate")
+        elif t.get("phase") not in ("setup", "build"):
+            errors.append(f"{step['id']}: time.phase must be setup or build")
         elif not (isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and 0 <= lo <= hi):
             errors.append(f"{step['id']}: time needs 0 <= min_minutes <= max_minutes")
         elif not t.get("basis", "").strip():
@@ -135,10 +137,12 @@ def self_check():
     guide["gaps"] = [{"text": "terms", "critical": True}]
     assert verify(guide, get)["status"] == "incomplete", "critical gap keeps guide incomplete"
     guide["gaps"] = []
-    guide["steps"][0]["time"] = {"kind": "estimate", "min_minutes": 30, "max_minutes": 60, "basis": "judgment"}
+    guide["steps"][0]["time"] = {"kind": "estimate", "phase": "build", "min_minutes": 30, "max_minutes": 60, "basis": "judgment"}
     assert time_errors(guide) == ["effort.assumptions is required when any step has an estimate"]
     guide["effort"] = {"assumptions": "experienced developer"}
     guide["steps"][1]["time"] = {"kind": "measured", "min_minutes": 0.6, "max_minutes": 0.6, "basis": "timed run"}
+    assert time_errors(guide) == ["b: time.phase must be setup or build"]
+    guide["steps"][1]["time"]["phase"] = "setup"
     assert time_errors(guide) == ["b: measured time needs measured_on"]
     guide["steps"][1]["time"]["measured_on"] = "2026-10-28"
     guide["steps"][0]["time"]["min_minutes"] = 90
