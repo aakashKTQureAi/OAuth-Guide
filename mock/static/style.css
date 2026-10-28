@@ -57,3 +57,33 @@ button, .button {
 }
 .secondary { margin-top: 20px; }
 .error { color: var(--gap); margin-top: 10px; min-height: 1.5em; }
+.eyebrow { text-transform: uppercase; letter-spacing: .06em; font-size: 12px; color: var(--muted); margin: 32px 0 0; }
+main h1 + .status-row { margin-top: -4px; }
+.status-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+h2 { font-size: 20px; margin: 36px 0 12px; }
+h3 { font-size: 17px; margin: 0; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.badge.ok { background: var(--ok-bg); color: var(--ok); }
+.badge.info { background: var(--info-bg); color: var(--info); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.gap { background: var(--gap-bg); color: var(--gap); }
+.badge.neutral { border: 1px solid var(--border); color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 20px; }
+.card, .step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.card .label { font-size: 13px; color: var(--muted); }
+.card .value { font-size: 20px; font-weight: 600; margin: 2px 0; }
+.card .hint { margin: 4px 0 0; }
+ol.steps { list-style: none; padding: 0; display: grid; gap: 12px; }
+.step.failed { border-color: var(--gap); }
+.step-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.step-head h3 { flex: 1 1 260px; }
+ul.plain { padding-left: 20px; }
+ul.plain li { margin-bottom: 10px; }
+table.settings { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; display: block; overflow-x: auto; }
+table.settings th, table.settings td { text-align: left; vertical-align: top; padding: 6px 8px; border-top: 1px solid var(--border); }
+code { font-size: 13px; overflow-wrap: anywhere; }
+.test { background: var(--ok-bg); color: var(--text); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font-size: 14px; }
+.check.fail { color: var(--gap); font-size: 14px; font-weight: 600; }
+details.source { font-size: 14px; margin-top: 6px; }
+details.source blockquote { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--border); color: var(--muted); }
+section ul li a { overflow-wrap: anywhere; }
