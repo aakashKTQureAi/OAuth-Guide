@@ -110,7 +110,10 @@ def run_job(request, conn):
         v = guide["verification"]
         say(f"{sum(r['ok'] for r in v['results'])} of {len(v['results'])} quotes confirmed; saved. Opening the guide…")
         guide["generated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
-        write_atomic(GUIDES / f"{slug}.json", guide)
+        current = GUIDES / f"{slug}.json"
+        if current.exists():  # keep the replaced guide one step back
+            write_atomic(GUIDES / f"{slug}.previous.json", json.loads(current.read_text()))
+        write_atomic(current, guide)
         (QUEUE / f"{slug}.json").unlink(missing_ok=True)
     except research.ResearchFailed as exc:
         update_request(slug, state="failed", note=str(exc))
@@ -149,6 +152,8 @@ def init_data():
 def load_guides():
     guides = []
     for path in sorted(GUIDES.glob("*.json")):
+        if path.name.endswith(".previous.json"):
+            continue
         try:
             guides.append(json.loads(path.read_text()))
         except (OSError, ValueError):
@@ -237,12 +242,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             slug = self.path.removeprefix("/api/status/")
             if not SLUG.match(slug):
                 return self.send_json(400, {"error": "bad slug"})
-            if (GUIDES / f"{slug}.json").exists():
-                return self.send_json(200, {"state": "ready"})
-            try:
+            try:  # a live request wins: during a regeneration the old guide still exists
                 return self.send_json(200, json.loads((QUEUE / f"{slug}.json").read_text()))
             except (OSError, ValueError):
-                return self.send_json(404, {"state": "unknown"})
+                pass
+            if (GUIDES / f"{slug}.json").exists():
+                return self.send_json(200, {"state": "ready"})
+            return self.send_json(404, {"state": "unknown"})
         return super().do_GET()
 
     def read_json(self, limit=2048):
@@ -258,6 +264,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/connect":
             return self.connect()
+        if self.path == "/api/regenerate":
+            return self.regenerate()
         if self.path == "/api/disconnect":
             session_drop(self.sid())
             return self.send_json(200, public_conn(None))
@@ -298,6 +306,29 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.send_json(503, {"error": "The research agent is busy. Try again in a minute."})
         return self.send_json(202, {"found": False, "slug": slug})
 
+
+    def regenerate(self):
+        slug = str((self.read_json() or {}).get("slug") or "")
+        if not SLUG.match(slug) or not (GUIDES / f"{slug}.json").exists():
+            return self.send_json(404, {"error": "No saved guide to regenerate."})
+        conn = session_get(self.sid())
+        if not conn:
+            return self.send_json(409, {"error": "Connect a model to regenerate this guide.", "needs_model": True})
+        guide = json.loads((GUIDES / f"{slug}.json").read_text())
+        first_source = next((s["source"]["url"] for s in guide.get("steps", []) if s.get("source", {}).get("url")), None)
+        request = {"slug": slug, "query": guide.get("name", slug), "docs_url": first_source, "state": "queued",
+                   "regenerate": True, "note": "Regenerating from current official documentation.",
+                   "requested_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+        path = QUEUE / f"{slug}.json"
+        try:
+            live = json.loads(path.read_text()).get("state") not in ("failed", None)
+        except (OSError, ValueError):
+            live = False
+        if not live:
+            write_atomic(path, request)
+        if not start_job(json.loads(path.read_text()), conn):
+            return self.send_json(503, {"error": "The research agent is busy. Try again in a minute."})
+        return self.send_json(202, {"slug": slug})
 
     def connect(self):
         body = self.read_json() or {}
@@ -391,6 +422,16 @@ def check_pipeline():
         failed = json.loads((QUEUE / "beta.json").read_text())
         assert failed["state"] == "failed" and "declined" in failed["note"] and key not in json.dumps(failed)
         assert not JOBS
+        research.RESEARCHERS["anthropic"] = fake
+        write_atomic(QUEUE / "acme.json", {"slug": "acme", "state": "queued"})
+        run_job({"slug": "acme", "query": "Acme", "regenerate": True}, conn)
+        assert (GUIDES / "acme.previous.json").exists() and [g["slug"] for g in load_guides()] == ["acme"]
+        research.RESEARCHERS["anthropic"] = boom
+        before = (GUIDES / "acme.json").read_text()
+        write_atomic(QUEUE / "acme.json", {"slug": "acme", "state": "queued"})
+        run_job({"slug": "acme", "query": "Acme", "regenerate": True}, conn)
+        assert (GUIDES / "acme.json").read_text() == before, "a failed regeneration keeps the saved guide"
+        assert json.loads((QUEUE / "acme.json").read_text())["state"] == "failed"
         write_atomic(QUEUE / "feed.json", {"slug": "feed", "state": "researching"})
         say = progress_for("feed")
         for i in range(MAX_ACTIVITY + 5):

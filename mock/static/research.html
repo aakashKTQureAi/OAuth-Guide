@@ -59,7 +59,13 @@
         showActivity(status.activity || []);
         startedAt = null;
         document.getElementById("title").textContent = `Could not research ${slug}`;
-        document.getElementById("note").textContent = status.note || "Research failed.";
+        document.getElementById("note").textContent = (status.note || "Research failed.") +
+          (status.regenerate ? " The saved guide is unchanged." : "");
+        if (status.regenerate) {
+          const back = document.querySelector("#retry-row a");
+          back.href = `/guide.html?slug=${encodeURIComponent(slug)}`;
+          back.textContent = "Back to the saved guide";
+        }
         document.getElementById("retry-row").hidden = false;
         document.getElementById("retry").onclick = async () => {
           const res = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: status.query }) });

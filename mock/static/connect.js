@@ -48,6 +48,7 @@ function initConnect() {
     showConnection(await fetch("/api/disconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json()));
   });
   refreshConnection();
+  if (new URLSearchParams(location.search).has("connect")) document.getElementById("conn-panel").open = true;
 }
 
 initConnect();

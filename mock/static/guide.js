@@ -107,7 +107,24 @@ function staleBanner(g) {
   if (t !== null && Date.now() - t < DAY_MS) return null;
   return el("div", { class: "stale", id: "stale" },
     el("p", {}, `This guide was last checked ${ageText(g).replace("Checked ", "").toLowerCase()}. Provider docs change; you can refresh it.`),
-    isTested(g) ? el("p", { class: "hint" }, "It includes hands-on test results that a docs-only regeneration cannot reproduce.") : null);
+    isTested(g) ? el("p", { class: "hint" }, "It includes hands-on test results that a docs-only regeneration cannot reproduce.") : null,
+    el("div", { class: "actions" }, button("Regenerate this guide", () => regenerate(g))),
+    el("p", { class: "hint", id: "stale-msg" }));
+}
+
+function button(label, onClick) {
+  const b = el("button", { type: "button" }, label);
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+async function regenerate(g) {
+  if (isTested(g) && !confirm("Regenerating replaces hands-on tested steps with documentation-only steps. The current guide is kept as the previous version. Continue?")) return;
+  const res = await fetch("/api/regenerate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: g.slug }) });
+  const body = await res.json();
+  if (res.status === 409 && body.needs_model) { location.href = "/?connect=1"; return; }
+  if (!res.ok) { document.getElementById("stale-msg").textContent = body.error; return; }
+  location.href = `/research.html?slug=${encodeURIComponent(g.slug)}`;
 }
 
 function render(g) {
