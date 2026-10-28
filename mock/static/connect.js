@@ -24,13 +24,25 @@ function initConnect() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const status = document.getElementById("conn-status");
-    status.textContent = "Checking the key…";
+    status.textContent = "Checking the key… this can take up to a minute.";
     const body = Object.fromEntries(new FormData(form));
-    form.elements.api_key.value = "";  // drop the key from the page as soon as it is sent
-    const res = await fetch("/api/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const out = await res.json();
+    const fields = [...form.elements];
+    fields.forEach(f => { f.disabled = true; });  // keep the masked key visible while it is checked
+    let res, out;
+    try {
+      res = await fetch("/api/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      out = await res.json();
+    } catch {
+      res = { ok: false }; out = { error: "Could not reach the server." };
+    } finally {
+      fields.forEach(f => { f.disabled = false; });
+    }
     status.textContent = res.ok ? "Connected. The key lives only in server memory for this session." : out.error;
-    if (res.ok) { showConnection(out); document.getElementById("conn-panel").open = false; }
+    if (res.ok) {
+      form.elements.api_key.value = "";  // verified and held server-side: drop it from the page
+      showConnection(out);
+      document.getElementById("conn-panel").open = false;
+    }
   });
   document.getElementById("conn-disconnect").addEventListener("click", async () => {
     showConnection(await fetch("/api/disconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json()));
