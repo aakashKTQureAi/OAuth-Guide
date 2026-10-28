@@ -22,6 +22,7 @@
       <li data-state="ready">Guide saved to the library</li>
     </ol>
     <p class="card" id="note" aria-live="polite">Waiting for the research agent…</p>
+    <p id="retry-row" hidden><button type="button" id="retry">Try again</button> <a href="/">Search for another app</a></p>
   </main>
   <script>
     const slug = new URLSearchParams(location.search).get("slug") || "";
@@ -32,6 +33,20 @@
       const status = await res.json();
       if (status.state === "ready") { location.href = `/guide.html?slug=${encodeURIComponent(slug)}`; return; }
       if (!res.ok) { document.getElementById("note").textContent = "No research request found. Start from the search page."; return; }
+      if (status.state === "failed") {
+        document.getElementById("title").textContent = `Could not research ${slug}`;
+        document.getElementById("note").textContent = status.note || "Research failed.";
+        document.getElementById("retry-row").hidden = false;
+        document.getElementById("retry").onclick = async () => {
+          const res = await fetch("/api/lookup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: status.query }) });
+          const body = await res.json();
+          if (!res.ok) { document.getElementById("note").textContent = body.error; return; }
+          document.getElementById("retry-row").hidden = true;
+          document.getElementById("title").textContent = `Researching ${slug}…`;
+          poll();
+        };
+        return;
+      }
       const at = order.indexOf(status.state);
       document.querySelectorAll("#progress li").forEach((li, i) => li.className = i < at ? "done" : i === at ? "active" : "");
       document.getElementById("note").textContent = status.note || "";

@@ -52,7 +52,11 @@
         body: JSON.stringify({ query: document.getElementById("q").value }),
       });
       const body = await res.json();
-      if (!res.ok) { error.textContent = body.error; return; }
+      if (!res.ok) {
+        error.textContent = body.error;
+        if (body.needs_model) document.getElementById("conn-panel").open = true;
+        return;
+      }
       const slug = encodeURIComponent(body.slug);
       location.href = body.found ? `/guide.html?slug=${slug}` : `/research.html?slug=${slug}`;
     });
